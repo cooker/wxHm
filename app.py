@@ -1,36 +1,37 @@
 import os
 import time
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'multi_qr_secret_key_2025'
+app.secret_key = 'multi_group_secure_key_2025'
 
 # --- 配置 ---
-UPLOAD_FOLDER = 'uploads'
-ADMIN_PASSWORD = 'admin123'  # 请修改此密码
-EXPIRE_DAYS = 7             # 微信群码有效期
+UPLOAD_BASE = 'uploads'
+ADMIN_PASSWORD = 'admin123'  # 务必修改此管理密码
+EXPIRE_DAYS = 7             # 微信群码7天有效期
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+if not os.path.exists(UPLOAD_BASE):
+    os.makedirs(UPLOAD_BASE)
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-def get_latest_valid_qr():
-    """遍历文件夹，返回最新且有效的图片文件名"""
-    files = [f for f in os.listdir(UPLOAD_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+def get_active_qr(group_name):
+    """获取指定群组下最新且未过期的二维码文件名"""
+    group_path = os.path.join(UPLOAD_BASE, group_name)
+    if not os.path.exists(group_path):
+        return None
+    
+    # 获取所有图片文件
+    files = [f for f in os.listdir(group_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     if not files:
         return None
     
-    # 按修改时间从新到旧排序
-    files.sort(key=lambda x: os.path.getmtime(os.path.join(UPLOAD_FOLDER, x)), reverse=True)
+    # 按修改时间倒序排列（最新的在前）
+    files.sort(key=lambda x: os.path.getmtime(os.path.join(group_path, x)), reverse=True)
     
     now = time.time()
     for filename in files:
-        path = os.path.join(UPLOAD_FOLDER, filename)
-        file_age_days = (now - os.path.getmtime(path)) / (24 * 3600)
-        
-        if file_age_days < EXPIRE_DAYS:
+        path = os.path.join(group_path, filename)
+        # 检查是否在有效期内
+        if (now - os.path.getmtime(path)) / (24 * 3600) < EXPIRE_DAYS:
             return filename
         else:
             # 自动清理物理文件
@@ -40,35 +41,48 @@ def get_latest_valid_qr():
                 pass
     return None
 
-@app.route('/')
-def index():
-    qr_file = get_latest_valid_qr()
+# --- 用户端：群组访问入口 ---
+@app.route('/group/<group_name>')
+def group_page(group_name):
+    qr_file = get_active_qr(group_name)
     timestamp = int(time.time() * 1000)
-    return render_template('index.html', qr_file=qr_file, timestamp=timestamp)
+    return render_template('index.html', group_name=group_name, qr_file=qr_file, timestamp=timestamp)
 
+# --- 管理端：群组管理与上传 ---
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
+    # 获取当前所有已存在的群组列表
+    existing_groups = [d for d in os.listdir(UPLOAD_BASE) if os.path.isdir(os.path.join(UPLOAD_BASE, d))]
+    
     if request.method == 'POST':
         pwd = request.form.get('password')
+        group_input = request.form.get('group_name').strip()
         file = request.files.get('file')
         
         if pwd != ADMIN_PASSWORD:
-            flash("验证失败：密码错误")
+            flash("密码校验失败，请重试！")
             return redirect(url_for('admin'))
         
-        if file and file.filename:
-            # 使用时间戳命名，确保存储多个不冲突
-            ext = os.path.splitext(file.filename)[1]
-            new_name = f"qr_{int(time.time())}{ext}"
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], new_name))
-            flash("新群码上传成功！系统已自动切换至此码。")
-            return redirect(url_for('index'))
+        if group_input and file:
+            # 为该群组创建独立文件夹
+            group_dir = os.path.join(UPLOAD_BASE, group_input)
+            if not os.path.exists(group_dir):
+                os.makedirs(group_dir)
             
-    return render_template('admin.html')
+            # 保存新码，文件名带时间戳防止冲突
+            ext = os.path.splitext(file.filename)[1]
+            new_filename = f"qr_{int(time.time())}{ext}"
+            file.save(os.path.join(group_dir, new_filename))
+            
+            flash(f"群组【{group_input}】二维码已更新！")
+            return redirect(url_for('admin'))
+            
+    return render_template('admin.html', groups=existing_groups)
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+# --- 图片服务路由 ---
+@app.route('/uploads/<group_name>/<filename>')
+def serve_qr(group_name, filename):
+    return send_from_directory(os.path.join(UPLOAD_BASE, group_name), filename)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8092, debug=True)

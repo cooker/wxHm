@@ -1,28 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>后台管理</title>
+    <title>活码后台管理</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f8f9fa; }
-        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #07c160; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        .msg { color: #f5222d; font-size: 14px; margin-bottom: 10px; }
+        body { font-family: sans-serif; background: #fdfdfd; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { background: white; border: 1px solid #eee; padding: 25px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+        input, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { background: #07c160; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .group-list { margin-top: 30px; width: 100%; max-width: 400px; }
+        .group-item { background: #fff; padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 14px; }
+        a { color: #007bff; text-decoration: none; }
+        .flash { color: #ff4d4f; font-size: 14px; text-align: center; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h3>更新码源 (支持多码存放)</h3>
-        {% with msgs = get_flashed_messages() %}
-            {% if msgs %}<p class="msg">{{ msgs[0] }}</p>{% endif %}
+    <div class="card">
+        <h3>多群组活码更新</h3>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<p class="flash">{{ messages[0] }}</p>{% endif %}
         {% endwith %}
         <form method="post" enctype="multipart/form-data">
             <input type="password" name="password" placeholder="管理密码" required>
-            <p style="font-size: 13px; color: #666;">上传新码后，旧码将作为备份保留（7天后自动清理）</p>
+            <input type="text" name="group_name" placeholder="群组名称（如：技术交流群）" required>
+            <p style="font-size: 12px; color: #999;">* 若群组已存在，上传将自动设为最新码</p>
             <input type="file" name="file" accept="image/*" required>
-            <button type="submit">确认上传并发布</button>
+            <button type="submit">上传并发布</button>
         </form>
+    </div>
+
+    <div class="group-list">
+        <h4>当前在线群组：</h4>
+        {% for g in groups %}
+        <div class="group-item">
+            <span>{{ g }}</span>
+            <a href="/group/{{ g }}" target="_blank">查看活码链接</a>
+        </div>
+        {% else %}
+        <p style="color: #ccc;">暂无群组，请从上方创建</p>
+        {% endfor %}
     </div>
 </body>
 </html>
