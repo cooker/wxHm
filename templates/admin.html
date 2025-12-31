@@ -1,30 +1,13 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>活码后台管理</title>
-    <style>
-        body { font-family: sans-serif; background: #fdfdfd; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .card { background: white; border: 1px solid #eee; padding: 25px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
-        input, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #ddd; box-sizing: border-box; }
-        button { background: #07c160; color: white; border: none; font-weight: bold; cursor: pointer; }
-        .group-list { margin-top: 30px; width: 100%; max-width: 400px; }
-        .group-item { background: #fff; padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 14px; }
-        a { color: #007bff; text-decoration: none; }
-        .flash { color: #ff4d4f; font-size: 14px; text-align: center; }
-    </style>
-</head>
 <body>
     <div class="card">
-        <h3>多群组活码更新</h3>
+        <h3>多群组活码管理</h3>
         {% with messages = get_flashed_messages() %}
             {% if messages %}<p class="flash">{{ messages[0] }}</p>{% endif %}
         {% endwith %}
+        
         <form method="post" enctype="multipart/form-data">
             <input type="password" name="password" placeholder="管理密码" required>
-            <input type="text" name="group_name" placeholder="群组名称（如：技术交流群）" required>
-            <p style="font-size: 12px; color: #999;">* 若群组已存在，上传将自动设为最新码</p>
+            <input type="text" name="group_name" placeholder="群组名称" required>
             <input type="file" name="file" accept="image/*" required>
             <button type="submit">上传并发布</button>
         </form>
@@ -33,13 +16,43 @@
     <div class="group-list">
         <h4>当前在线群组：</h4>
         {% for g in groups %}
-        <div class="group-item">
-            <span>{{ g }}</span>
-            <a href="/group/{{ g }}" target="_blank">查看活码链接</a>
+        <div class="group-item" style="flex-direction: column; align-items: flex-start; gap: 10px; border: 1px solid #eee; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+            <div style="width: 100%; display: flex; justify-content: space-between;">
+                <strong>{{ g }}</strong>
+                <a href="/group/{{ g }}" target="_blank">预览链接</a>
+            </div>
+            
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <form action="/admin/rename" method="post" style="display: flex; gap: 5px; flex: 1;">
+                    <input type="hidden" name="password" class="pwd-input-hidden"> <input type="hidden" name="old_name" value="{{ g }}">
+                    <input type="text" name="new_name" placeholder="新名称" required style="margin: 0; padding: 5px;">
+                    <button type="button" onclick="submitRename(this)" style="padding: 5px 10px; width: auto; font-size: 12px; background: #1890ff;">更名</button>
+                </form>
+
+                <form action="/admin/delete/{{ g }}" method="post" onsubmit="return confirm('确定要删除整个群组吗？')">
+                    <input type="hidden" name="password" class="pwd-input-hidden">
+                    <button type="button" onclick="submitDelete(this)" style="padding: 5px 10px; width: auto; font-size: 12px; background: #ff4d4f;">删除</button>
+                </form>
+            </div>
         </div>
-        {% else %}
-        <p style="color: #ccc;">暂无群组，请从上方创建</p>
         {% endfor %}
     </div>
+
+    <script>
+        // 为了方便，点击按钮时自动获取第一个输入框里的密码
+        function submitRename(btn) {
+            const pwd = document.querySelector('input[name="password"]').value;
+            if(!pwd) { alert("请先在上方输入管理密码"); return; }
+            btn.form.querySelector('.pwd-input-hidden').value = pwd;
+            btn.form.submit();
+        }
+        function submitDelete(btn) {
+            const pwd = document.querySelector('input[name="password"]').value;
+            if(!pwd) { alert("请先在上方输入管理密码"); return; }
+            if(confirm('确定要删除该群组及其所有图片吗？')) {
+                btn.form.querySelector('.pwd-input-hidden').value = pwd;
+                btn.form.submit();
+            }
+        }
+    </script>
 </body>
-</html>

@@ -84,5 +84,46 @@ def admin():
 def serve_qr(group_name, filename):
     return send_from_directory(os.path.join(UPLOAD_BASE, group_name), filename)
 
+import shutil  # 必须引入，用于删除非空文件夹
+
+# ... 原有代码保持不变 ...
+
+# --- 路由：删除群组 ---
+@app.route('/admin/delete/<group_name>', methods=['POST'])
+def delete_group(group_name):
+    pwd = request.form.get('password')
+    if pwd != ADMIN_PASSWORD:
+        flash("密码错误，无法删除！")
+        return redirect(url_for('admin'))
+    
+    group_path = os.path.join(UPLOAD_BASE, group_name)
+    if os.path.exists(group_path):
+        shutil.rmtree(group_path)  # 递归删除整个文件夹及其内容
+        flash(f"群组【{group_name}】已成功删除")
+    return redirect(url_for('admin'))
+
+# --- 路由：群组更名 ---
+@app.route('/admin/rename', methods=['POST'])
+def rename_group():
+    pwd = request.form.get('password')
+    old_name = request.form.get('old_name')
+    new_name = request.form.get('new_name').strip()
+    
+    if pwd != ADMIN_PASSWORD:
+        flash("密码错误，无法重命名！")
+        return redirect(url_for('admin'))
+    
+    if old_name and new_name:
+        old_path = os.path.join(UPLOAD_BASE, old_name)
+        new_path = os.path.join(UPLOAD_BASE, new_name)
+        
+        if os.path.exists(new_path):
+            flash("错误：新群组名已存在！")
+        elif os.path.exists(old_path):
+            os.rename(old_path, new_path)
+            flash(f"群组已从【{old_name}】更名为【{new_name}】")
+            
+    return redirect(url_for('admin'))
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8092, debug=True)
