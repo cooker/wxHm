@@ -1,0 +1,106 @@
+-- MySQL schema for WeChat Huoma system (PHP skeleton)
+
+CREATE TABLE `users` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(100) NOT NULL UNIQUE,
+  `password_hash` VARCHAR(255) NOT NULL,
+  `is_admin` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `plans` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL,
+  `type` ENUM('monthly','yearly','count') NOT NULL,
+  `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `count` INT DEFAULT NULL,
+  `period_months` INT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `orders` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `plan_id` INT UNSIGNED DEFAULT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `status` ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+  `trade_no` VARCHAR(128) DEFAULT NULL,
+  `payment_provider` VARCHAR(50) DEFAULT NULL,
+  `meta` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `subscriptions` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `plan_id` INT UNSIGNED NOT NULL,
+  `expires_at` DATETIME DEFAULT NULL,
+  `remaining_count` INT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`plan_id`) REFERENCES `plans`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `huoma` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `title` VARCHAR(255) DEFAULT NULL,
+  `target_url` VARCHAR(1000) NOT NULL,
+  `clicks` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 存储系统配置（如回调域名、支付配置等）
+CREATE TABLE `settings` (
+  `k` VARCHAR(191) NOT NULL,
+  `v` TEXT DEFAULT NULL,
+  PRIMARY KEY (`k`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 推广联盟相关表：推荐关系、佣金流水、提现申请
+CREATE TABLE `referrals` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `referrer_id` INT UNSIGNED NOT NULL,
+  `referred_id` INT UNSIGNED NOT NULL,
+  `level` TINYINT NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`referrer_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`referred_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `affiliate_earnings` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `order_id` INT UNSIGNED DEFAULT NULL,
+  `amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `level` TINYINT NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `withdrawals` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `status` ENUM('pending','processed','rejected') NOT NULL DEFAULT 'pending',
+  `meta` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 在用户表添加推广相关设置（若已存在表，请手动执行 ALTER）
+-- 注意：某些 MySQL 旧版本可能不支持一次性添加多个列，请根据环境分步执行。
+ALTER TABLE `users`
+  ADD COLUMN `show_prompt` TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN `prompt_content` TEXT DEFAULT NULL,
+  ADD COLUMN `promo_code` VARCHAR(64) DEFAULT NULL;
