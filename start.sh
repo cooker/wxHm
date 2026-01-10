@@ -2,15 +2,23 @@
 
 # --- 配置区 ---
 APP_NAME="wxHm"
-PORT=8092
-WORKERS=4  # 建议设为 CPU 核心数 * 2 + 1
+PORT=5000
+WORKERS=4
 LOG_DIR="logs"
 PID_FILE="app.pid"
+
+# --- 获取 IP 地址逻辑 ---
+# 获取内网 IP (取第一个)
+LAN_IP=$(hostname -I | awk '{print $1}')
+
+# 获取外网 IP (通过 API 探测，若无外网则显示等待解析)
+WAN_IP=$(curl -s --max-time 2 ifconfig.me || echo "无法获取/无公网IP")
 
 # --- 初始化环境 ---
 mkdir -p $LOG_DIR
 mkdir -p uploads
 
+echo "------------------------------------------------"
 echo "🚀 正在启动 $APP_NAME..."
 
 # 1. 检查端口是否被占用
@@ -20,9 +28,6 @@ if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null ; then
 fi
 
 # 2. 启动 Gunicorn (后台运行)
-# --access-log: 记录访问请求
-# --error-log: 记录运行错误
-# --daemon: 后台守护进程运行
 gunicorn --workers $WORKERS \
          --bind 0.0.0.0:$PORT \
          --access-logfile $LOG_DIR/access.log \
@@ -33,9 +38,16 @@ gunicorn --workers $WORKERS \
 
 if [ $? -eq 0 ]; then
     echo "✅ $APP_NAME 启动成功！"
-    echo "📍 访问地址: http://你的服务器IP:$PORT"
-    echo "📝 日志文件位于 $LOG_DIR/ 目录下"
-    echo "🔢 进程 PID 已写入 $PID_FILE"
+    echo "------------------------------------------------"
+    echo "📍 访问地址清单:"
+    echo "   - 本地回环: http://127.0.0.1:$PORT"
+    echo "   - 内网访问: http://$LAN_IP:$PORT"
+    echo "   - 外网访问: http://$WAN_IP:$PORT"
+    echo "------------------------------------------------"
+    echo "📝 管理台地址: http://$LAN_IP:$PORT/admin"
+    echo "📊 统计趋势图: http://$LAN_IP:$PORT/admin/stats"
+    echo "------------------------------------------------"
+    echo "💡 提示: 外网访问需确保防火墙/安全组已开放 $PORT 端口"
 else
-    echo "❌ 启动失败，请检查 logs/error.log"
+    echo "❌ 启动失败，请检查 $LOG_DIR/error.log"
 fi
