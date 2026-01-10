@@ -1,121 +1,141 @@
-import os
-import time
-import shutil
-import urllib.parse
+import os, time, shutil, urllib.parse
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
+from user_agents import parse
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = 'wxHm_secure_key_2026'
-
-# 核心配置：告诉 Flask 它在代理（如 Cloudflare/Nginx）后面
-# 这能确保 request.host_url 正确识别 https
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# --- 配置中心 ---
+# --- 数据库配置 ---
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///stats.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
 UPLOAD_BASE = 'uploads'
-ADMIN_PASSWORD = 'admin123'  # 建议修改
+ADMIN_PASSWORD = 'admin123' 
 EXPIRE_DAYS = 7             
 
-if not os.path.exists(UPLOAD_BASE):
-    os.makedirs(UPLOAD_BASE)
+if not os.path.exists(UPLOAD_BASE): os.makedirs(UPLOAD_BASE)
 
-# 解决跨域与 Referrer Policy 拦截问题
+class VisitLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_name = db.Column(db.String(50), index=True)
+    date = db.Column(db.String(10), index=True)
+    ip = db.Column(db.String(50))
+    platform = db.Column(db.String(20))
+
+with app.app_context(): db.create_all()
+
 @app.after_request
 def add_header(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
     return response
 
 def get_active_qr(group_name):
     group_path = os.path.join(UPLOAD_BASE, group_name)
     if not os.path.exists(group_path): return None
-    files = [f for f in os.listdir(group_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+    files = [f for f in os.listdir(group_path) if f.lower().endswith(('.webp', '.png', '.jpg'))]
     if not files: return None
     files.sort(key=lambda x: os.path.getmtime(os.path.join(group_path, x)), reverse=True)
-    
     now = time.time()
-    active_file = None
     for filename in files:
         path = os.path.join(group_path, filename)
-        if (now - os.path.getmtime(path)) / (24 * 3600) < EXPIRE_DAYS:
-            if not active_file: active_file = filename
-        else:
-            try: os.remove(path)
-            except: pass
-    return active_file
+        if (now - os.path.getmtime(path)) / 86400 < EXPIRE_DAYS: return filename
+        else: os.remove(path)
+    return None
 
 # --- 路由：展示页 ---
 @app.route('/group/<group_name>')
 def group_page(group_name):
     qr_file = get_active_qr(group_name)
     
+    # 记录统计：解析设备
+    ua = parse(request.headers.get('User-Agent', ''))
+    if ua.is_mobile:
+        platform = 'iOS' if 'iPhone' in ua.ua_string or 'iPad' in ua.ua_string else 'Android'
+    else:
+        if 'Windows' in ua.ua_string: platform = 'Windows'
+        elif 'Macintosh' in ua.ua_string: platform = 'Mac'
+        elif 'Linux' in ua.ua_string: platform = 'Linux'
+        else: platform = 'Other'
+
+    db.session.add(VisitLog(group_name=group_name, date=datetime.now().strftime('%Y-%m-%d'), 
+                            ip=request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0],
+                            platform=platform))
+    db.session.commit()
+
     wsrv_url = ""
     if qr_file:
-        # 强制使用 https 并进行 URL 编码，防止 wsrv 抓取失败
-        host = request.host
-        raw_img_url = f"https://{host}/uploads/{group_name}/{qr_file}"
-        encoded_raw_url = urllib.parse.quote(raw_img_url, safe='')
-        wsrv_url = f"https://wsrv.nl/?url={encoded_raw_url}&we=1&v={int(time.time())}"
+        raw_url = f"https://{request.host}/uploads/{group_name}/{qr_file}"
+        wsrv_url = f"https://wsrv.nl/?url={urllib.parse.quote(raw_url, safe='')}&we=1&v={int(time.time())}"
     
     return render_template('index.html', group_name=group_name, qr_file=qr_file, wsrv_url=wsrv_url)
 
-# --- 路由：管理后台 ---
+# --- 路由：统计看板 ---
+@app.route('/admin/stats')
+def stats():
+    today = datetime.now().strftime('%Y-%m-%d')
+    dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    dates.reverse()
+
+    groups = [d for d in os.listdir(UPLOAD_BASE) if os.path.isdir(os.path.join(UPLOAD_BASE, d))]
+    stats_result = {}
+    for g in groups:
+        trend = []
+        for d in dates:
+            pv = VisitLog.query.filter_by(group_name=g, date=d).count()
+            uv = db.session.query(VisitLog.ip).filter_by(group_name=g, date=d).distinct().count()
+            trend.append({'date': d, 'pv': pv, 'uv': uv})
+        
+        pie = [{"name": p[0], "value": p[1]} for p in db.session.query(VisitLog.platform, db.func.count(VisitLog.id))
+               .filter_by(group_name=g, date=today).group_by(VisitLog.platform).all()]
+        stats_result[g] = {"trend": trend, "pie": pie}
+
+    # 清理过期数据
+    VisitLog.query.filter(VisitLog.date < (datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')).delete()
+    db.session.commit()
+    return render_template('stats.html', stats_data=stats_result)
+
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
-    existing_groups = [d for d in os.listdir(UPLOAD_BASE) if os.path.isdir(os.path.join(UPLOAD_BASE, d))]
-    existing_groups.sort()
-    
+    groups = sorted([d for d in os.listdir(UPLOAD_BASE) if os.path.isdir(os.path.join(UPLOAD_BASE, d))])
     if request.method == 'POST':
-        pwd = request.form.get('password')
-        group_input = request.form.get('group_name', '').strip()
-        file = request.files.get('file')
-        
-        if pwd != ADMIN_PASSWORD:
-            flash("密码错误！")
-            return redirect(url_for('admin'))
-        
-        if group_input and file:
-            group_dir = os.path.join(UPLOAD_BASE, group_input)
-            if not os.path.exists(group_dir): os.makedirs(group_dir)
-            try:
+        if request.form.get('password') == ADMIN_PASSWORD:
+            g_name = request.form.get('group_name', '').strip()
+            file = request.files.get('file')
+            if g_name and file:
+                g_dir = os.path.join(UPLOAD_BASE, g_name)
+                if not os.path.exists(g_dir): os.makedirs(g_dir)
                 img = Image.open(file)
                 if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                new_filename = f"qr_{int(time.time())}.webp"
-                img.save(os.path.join(group_dir, new_filename), "WEBP", quality=80)
-                flash(f"群组【{group_input}】上传成功")
-            except Exception as e:
-                flash(f"失败: {str(e)}")
-            return redirect(url_for('admin'))
-            
-    return render_template('admin.html', groups=existing_groups)
+                img.save(os.path.join(g_dir, f"qr_{int(time.time())}.webp"), "WEBP", quality=80)
+                flash("更新成功")
+        else: flash("密码错误")
+        return redirect(url_for('admin'))
+    return render_template('admin.html', groups=groups)
 
 @app.route('/admin/rename', methods=['POST'])
 def rename_group():
-    pwd = request.form.get('password')
-    old_name = request.form.get('old_name')
-    new_name = request.form.get('new_name', '').strip()
-    if pwd == ADMIN_PASSWORD and old_name and new_name:
-        os.rename(os.path.join(UPLOAD_BASE, old_name), os.path.join(UPLOAD_BASE, new_name))
-        flash("更名成功")
+    if request.form.get('password') == ADMIN_PASSWORD:
+        os.rename(os.path.join(UPLOAD_BASE, request.form.get('old_name')), os.path.join(UPLOAD_BASE, request.form.get('new_name').strip()))
     return redirect(url_for('admin'))
 
 @app.route('/admin/delete/<group_name>', methods=['POST'])
 def delete_group(group_name):
-    pwd = request.form.get('password')
-    if pwd == ADMIN_PASSWORD:
-        shutil.rmtree(os.path.join(UPLOAD_BASE, group_name))
-        flash("删除成功")
+    if request.form.get('password') == ADMIN_PASSWORD: shutil.rmtree(os.path.join(UPLOAD_BASE, group_name))
     return redirect(url_for('admin'))
 
 @app.route('/uploads/<group_name>/<filename>')
-def serve_qr(group_name, filename):
-    return send_from_directory(os.path.join(UPLOAD_BASE, group_name), filename)
+def serve_qr(group_name, filename): return send_from_directory(os.path.join(UPLOAD_BASE, group_name), filename)
 
 @app.route('/')
 def home():
-    return redirect(url_for('admin'))
+    """项目介绍首页"""
+    github_url = "https://github.com/cooker/wxHm" # 替换为你的真实地址
+    return render_template('home.html', github_url=github_url)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8092)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=8092)

@@ -10,14 +10,10 @@
         .card { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
         .qr-box { position: relative; width: 250px; height: 250px; margin: 25px auto; background: #fafafa; border: 1px solid #eee; overflow: hidden; }
         .qr-img { width: 100%; height: 100%; object-fit: contain; }
-        .scanner {
-            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, #07c160, transparent);
-            box-shadow: 0 0 8px #07c160; animation: scan 3s infinite linear;
-        }
+        .scanner { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #07c160, transparent); box-shadow: 0 0 8px #07c160; animation: scan 3s infinite linear; }
         @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
         .ok { color: #07c160; font-weight: bold; margin: 15px 0; }
-        .hint { color: #888; font-size: 13px; line-height: 1.6; }
+        .hint { color: #888; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -29,9 +25,9 @@
                 <img src="{{ wsrv_url }}" class="qr-img" onerror="this.src='/uploads/{{ group_name }}/{{ qr_file }}'">
             </div>
             <p class="ok">● 入口已激活</p>
-            <p class="hint">长按上方二维码<br>识别并加入群聊</p>
+            <p class="hint">长按上方二维码识别并加入群聊</p>
         {% else %}
-            <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效群二维码</p>
+            <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效二维码</p>
         {% endif %}
     </div>
 </body>

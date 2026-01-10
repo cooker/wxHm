@@ -1,4 +1,4 @@
 # 核心 Web 框架
 Flask>=2.0.0
 Pillow>=9.0.0
-gunicorn>=20.1.0
+Flask-SQLAlchemy>=3.0.0

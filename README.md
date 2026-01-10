@@ -1,101 +1,109 @@
-# wxHm (WeChat Group Live QR Code Manager)
-
-**wxHm** 是一个轻量级、高性能的微信群活码管理系统。它解决了微信群二维码 7 天有效期限制的痛点，通过固定链接分发，后台动态更新二维码，并集成了 WebP 自动转换与全球 CDN 加速。
+这是一份为您精心编写的完整 `README.md`。它不仅包含了项目的最新功能说明，还详细记录了从基础版到当前**数据驱动版**的所有技术演进。
 
 ---
 
-## ✨ 核心功能
+# 📅 wxHm 项目变更日志与完整说明书
 
-* **多群组独立管理**：支持创建多个群组（如：技术群、福利群），每个群组拥有唯一的永久访问路径。
-* **智能码源轮转**：自动识别群组目录下最新的二维码，无需手动删除旧码即可完成更新。
-* **WebP 自动优化**：后端自动将上传的 JPG/PNG 图片转为 WebP 格式，大幅缩减文件体积。
-* **全球 CDN 加速**：集成 `wsrv.nl` 图像处理引擎，支持分布式节点缓存与快速分发。
-* **自动化清理机制**：系统自动扫描并物理删除超过 7 天的陈旧图片，保持服务器整洁。
-* **3天免密管理**：管理员登录后密码自动在本地加密缓存 3 天，提升移动端维护体验。
-* **动态视觉引导**：前端页面内置绿色扫描线动画，深度适配微信用户长按识别习惯。
-* **强制去缓存策略**：URL 附加随机时间戳，彻底穿透微信内置浏览器的强缓存。
+本文件记录了 `wxHm` (WeChat LiveCode Manager) 从 v1.0 到 v1.5 的所有重大更新。
 
 ---
 
-## 📅 变更记录 (Changelog)
+## 🚀 核心功能概览
 
-### v1.2.0 (2026-01-07) - 当前版本
+`wxHm` 是一个专为微信群运营设计的活码管理系统，旨在解决群二维码 7 天过期的痛点。
 
-* **[Feature]** 引入 `wsrv.nl` CDN 图片处理，支持全球加速。
-* **[Feature]** 强制 `base_url` 走 HTTPS 协议，适配 Cloudflare 生产环境。
-* **[Fix]** 解决 `strict-origin-when-cross-origin` 导致的跨域加载问题。
-* **[Fix]** 适配 `ProxyFix` 确保在 Nginx/CF 反代下能正确识别 Host。
-
-### v1.1.0
-
-* **[Feature]** 增加群组“重命名”与“一键删除”功能。
-* **[Feature]** 实现管理员密码本地缓存 3 天逻辑。
-* **[Optimization]** 增加 Pillow 库支持，实现上传自动转 WebP。
-
-### v1.0.0
-
-* **[Base]** 基础 Flask 架构发布，支持单群组活码展示与上传。
+* **智能活码分发**：固定链接访问，后台动态轮转最新上传的二维码。
+* **图像性能引擎**：自动 WebP 转换与 `wsrv.nl` 全球 CDN 镜像镜像加速。
+* **多维数据看板**：集成 ECharts，实时展示 7 日 PV/UV 趋势及今日设备（iOS/安卓/PC）占比。
+* **自动化运维**：物理文件与统计数据均支持 7 天自动清理循环。
+* **极简管理体验**：3 天免密登录缓存，支持群组一键更名与物理删除。
 
 ---
 
-## 📂 项目结构
+## 📝 详细变更记录
 
-```text
-wxHm/
-├── app.py                # 后端核心逻辑 (Flask)
-├── uploads/              # 二维码存储目录 (按群组划分)
-├── templates/
-│   ├── index.html        # 用户扫码展示页
-│   └── admin.html        # 管理后台页
-├── start.sh              # Linux 后台启动脚本
-├── requirements.txt      # 依赖库清单
-└── .gitignore            # Git 忽略配置
+### v1.5.0 (最新版本) - 设备画像与环形图表
 
-```
+* **[新增]** 引入 `user-agents` 库，支持识别访问者的操作系统（iOS, Android, Windows, Mac, Linux）。
+* **[新增]** `stats.html` 新增**今日设备分布环形图**，直观展现流量来源比例。
+* **[优化]** 统计逻辑升级，支持在一个页面同时查看多个群组的独立趋势图与占比图。
+* **[修复]** 修正了 `X-Forwarded-For` 在多层代理下获取真实 IP 的准确性。
+
+### v1.4.0 - 数据统计与图表化
+
+* **[新增]** 集成 **SQLite 数据库**，实现轻量级访问日志存储。
+* **[新增]** 引入 **ECharts 5.x**，将枯燥的表格数据转化为**动态面积趋势图**。
+* **[逻辑]** 实现统计数据 7 天自动回滚清理，防止数据库文件无限膨胀。
+
+### v1.3.0 - 网络兼容性与安全策略
+
+* **[新增]** 引入 `ProxyFix` 中间件，完美适配 **Cloudflare/Nginx** 反向代理环境。
+* **[优化]** 强制 `base_url` 走 **HTTPS** 协议，解决 `wsrv.nl` 在安全环境下抓图失败的问题。
+* **[安全]** 调整 `Referrer-Policy` 为 `no-referrer-when-downgrade`，解决跨域策略导致的图片无法显示（strict-origin）。
+
+### v1.2.0 - 性能突破
+
+* **[新增]** 集成 **Pillow (PIL)**，所有上传图片自动压缩并转换为 **WebP** 格式。
+* **[新增]** 接入 `wsrv.nl` CDN 镜像加速，实现图片边缘节点缓存，极速秒开。
+* **[功能]** 支持图片加载失败时的自动降级逻辑（onerror fallback）。
+
+### v1.1.0 - 多群组协作
+
+* **[新增]** 支持多群组隔离，每个群组拥有独立的 `uploads` 文件夹。
+* **[新增]** 增加后台管理功能：群组一键重命名、一键物理删除。
+* **[体验]** 增加管理员密码本地缓存（localStorage），3 天内无需重复输入。
 
 ---
 
-## 🚀 快速开始
+## 🛠️ 技术架构说明
 
-### 1. 环境准备
+| 组件 | 技术选型 | 说明 |
+| --- | --- | --- |
+| **后端框架** | Flask 2.x | 核心逻辑处理与路由分发 |
+| **数据库** | SQLite | 存储 7 日访问统计（PV/UV/设备） |
+| **图像处理** | Pillow | 实现 WebP 自动压缩与格式转换 |
+| **CDN 加速** | wsrv.nl | 全球边缘镜像分发，降低带宽压力 |
+| **前端图表** | ECharts 5.x | 数据可视化看板 |
+| **设备识别** | user-agents | 解析请求头识别操作系统 |
+
+---
+
+## 📦 部署指南
+
+### 1. 环境安装
 
 ```bash
-git clone https://github.com/cooker/wxHm.git
-cd wxHm
-pip install -r requirements.txt
+pip install Flask Flask-SQLAlchemy Pillow user-agents werkzeug gunicorn
 
 ```
 
-### 2. 配置修改
+### 2. 关键配置
 
-打开 `app.py`，修改 `ADMIN_PASSWORD` 为你的管理密码。
+修改 `app.py` 中的 `ADMIN_PASSWORD`。
 
-### 3. 一键启动
+### 3. Nginx 配置建议 (若有)
 
-```bash
-# Linux
-chmod +x start.sh && ./start.sh
+务必添加以下 Header 以支持 IP 识别：
 
-# Windows
-python app.py
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 
 ```
 
 ---
 
-## 🛠️ 生产环境建议 (Cloudflare/Nginx)
+## 💡 维护建议
 
-1. **关闭 Hotlink Protection**：在 Cloudflare 的 Scrape Shield 中关闭防盗链，否则 CDN 无法抓取图片。
-2. **HTTPS 强制**：在 Cloudflare 中开启 "Always Use HTTPS"。
-3. **Referrer 策略**：本项目已内置 `no-referrer-when-downgrade`，以确保跨域抓取成功。
-
----
-
-## 📜 许可证
-
-本项目采用 [MIT License](https://www.google.com/search?q=LICENSE) 开源。
+* **备份**：由于数据存储在 `stats.db`，建议定期备份该单文件。
+* **清理**：系统会自动清理 7 天前的文件，无需手动操作 `uploads` 文件夹。
 
 ---
+
+**您觉得这份 README 是否还需要增加一个“常见问题 (FAQ)”板块，来解决 Cloudflare 拦截等具体环境配置问题？**
 
 **项目地址**: [https://github.com/cooker/wxHm](https://github.com/cooker/wxHm)
 
