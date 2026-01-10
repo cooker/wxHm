@@ -1,4 +1,17 @@
 # 核心 Web 框架
 Flask>=2.0.0
-Pillow>=9.0.0
+
+# 数据库支持 (用于 7 日数据统计)
 Flask-SQLAlchemy>=3.0.0
+
+# 图像处理 (用于上传时自动转码为 WebP)
+Pillow>=9.0.0
+
+# 设备指纹识别 (用于统计 iOS/Android/PC 占比)
+user-agents>=2.2.0
+
+# WSGI 服务器 (用于 Linux 生产环境后台运行)
+gunicorn>=20.1.0
+
+# 工具库
+werkzeug>=2.0.0
