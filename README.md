@@ -103,6 +103,24 @@ location / {
 
 ---
 
+## 如何使用 Docker 部署
+A. 构建并启动
+在项目根目录运行：
+
+```Bash
+docker-compose up -d
+```
+
+B. 查看容器状态
+```Bash
+docker ps
+```
+C. 查看运行日志
+```Bash
+
+docker logs -f wxhm_app
+```
+
 **您觉得这份 README 是否还需要增加一个“常见问题 (FAQ)”板块，来解决 Cloudflare 拦截等具体环境配置问题？**
 
 **项目地址**: [https://github.com/cooker/wxHm](https://github.com/cooker/wxHm)
