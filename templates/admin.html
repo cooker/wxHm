@@ -14,6 +14,8 @@
         .group-item { background: white; margin-top: 10px; padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; font-size: 14px; }
         .btn-op { background: none; color: #1890ff; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; }
         .btn-del { color: #ff4d4f; }
+        .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
+        .btn-delete:hover { background: #ff7875; }
     </style>
 </head>
 <body>
@@ -40,7 +42,7 @@
             <div>
                 <a href="/group/{{ g }}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
                 <button class="btn-op" onclick="handleRename('{{ g }}')">更名</button>
-                <button class="btn-op btn-del" onclick="handleDelete('{{ g }}')">删除</button>
+                <button class="btn-delete" onclick="handleDelete('{{ g }}')">删除</button>
             </div>
         </div>
         {% endfor %}
