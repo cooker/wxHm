@@ -16,10 +16,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 UPLOAD_BASE = 'uploads'
+FILES_DIR = os.path.join(UPLOAD_BASE, 'files')
 ADMIN_PASSWORD = 'admin123' 
 EXPIRE_DAYS = 7             
 
 if not os.path.exists(UPLOAD_BASE): os.makedirs(UPLOAD_BASE)
+if not os.path.exists(FILES_DIR): os.makedirs(FILES_DIR)
 
 class VisitLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -137,5 +139,67 @@ def home():
     """项目介绍首页"""
     github_url = "https://github.com/cooker/wxHm" # 替换为你的真实地址
     return render_template('home.html', github_url=github_url)
+
+@app.route('/<filename>')
+def serve_file(filename):
+    """提供上传的文件访问（根路径访问）"""
+    # 排除包含斜杠的路径（多段路径应该由其他路由处理）
+    if '/' in filename:
+        from flask import abort
+        abort(404)
+    
+    # 安全检查：防止路径遍历
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(FILES_DIR, safe_filename)
+    
+    # 检查文件是否存在
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(FILES_DIR, safe_filename)
+    else:
+        # 文件不存在，返回404（让Flask继续匹配其他路由，但实际上Flask不会继续匹配）
+        from flask import abort
+        abort(404)
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    """上传自定义文件（需要管理员密码）"""
+    # 验证密码
+    if request.form.get('password') != ADMIN_PASSWORD:
+        flash('密码错误')
+        return redirect(url_for('admin'))
+    
+    if 'file' not in request.files:
+        flash('请选择文件')
+        return redirect(url_for('admin'))
+    
+    file = request.files['file']
+    if file.filename == '':
+        flash('请选择文件')
+        return redirect(url_for('admin'))
+    
+    # 获取原始文件名
+    filename = file.filename
+    # 如果用户提供了自定义文件名，使用自定义文件名，否则使用原始文件名
+    custom_name = request.form.get('custom_name', '').strip()
+    if custom_name:
+        filename = custom_name
+    
+    # 确保文件名安全
+    filename = os.path.basename(filename)
+    if not filename:
+        flash('文件名无效')
+        return redirect(url_for('admin'))
+    
+    # 保存文件
+    file_path = os.path.join(FILES_DIR, filename)
+    try:
+        file.save(file_path)
+        file_url = url_for('serve_file', filename=filename, _external=True)
+        flash(f'上传成功！文件已保存为: {filename}，访问链接: {file_url}')
+    except Exception as e:
+        flash(f'上传失败: {str(e)}')
+    
+    return redirect(url_for('admin'))
+
 
 if __name__ == '__main__': app.run(host='0.0.0.0', port=8092)

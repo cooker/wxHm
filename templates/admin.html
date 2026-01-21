@@ -16,6 +16,12 @@
         .btn-del { color: #ff4d4f; }
         .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         .btn-delete:hover { background: #ff7875; }
+        .divider { width: 100%; max-width: 400px; height: 1px; background: #eee; margin: 20px 0; }
+        .upload-section { margin-top: 20px; }
+        .upload-section label { display: block; margin-top: 10px; font-size: 13px; color: #666; }
+        .upload-section input[type="text"] { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .upload-section input[type="file"] { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .msg-success { color: #07c160; font-size: 13px; text-align: center; }
     </style>
 </head>
 <body>
@@ -25,7 +31,9 @@
     <div class="card">
         <h3 style="margin-top:0">管理中心</h3>
         {% with msgs = get_flashed_messages() %}
-            {% if msgs %}<p class="msg">{{ msgs[0] }}</p>{% endif %}
+            {% if msgs %}
+                <p class="{% if '成功' in msgs[0] %}msg-success{% else %}msg{% endif %}">{{ msgs[0] }}</p>
+            {% endif %}
         {% endwith %}
         <form method="post" enctype="multipart/form-data" onsubmit="savePwd()">
             <input type="password" id="mainPwd" name="password" placeholder="管理密码" required>
@@ -33,6 +41,19 @@
             <input type="file" name="file" accept="image/*" required>
             <button type="submit">上传并发布</button>
         </form>
+        
+        <div class="divider"></div>
+        
+        <div class="upload-section">
+            <h4 style="margin-top:0">📁 上传自定义文件</h4>
+            <form method="post" enctype="multipart/form-data" action="/upload" onsubmit="savePwd()">
+                <input type="password" name="password" id="uploadPwd" placeholder="管理密码" required>
+                <input type="file" name="file" required>
+                <label for="custom_name">自定义文件名（可选，留空则使用原文件名）：</label>
+                <input type="text" id="custom_name" name="custom_name" placeholder="例如: 34cd1443732dd2878beb10347c7d3da5.txt">
+                <button type="submit">上传文件</button>
+            </form>
+        </div>
     </div>
 
     <div style="width:100%; max-width:400px; margin-top:20px;">
@@ -56,7 +77,10 @@
         window.onload = () => {
             const pwd = localStorage.getItem(PWD_KEY);
             const exp = localStorage.getItem(EXPIRE_KEY);
-            if (pwd && exp && new Date().getTime() < exp) document.getElementById('mainPwd').value = pwd;
+            if (pwd && exp && new Date().getTime() < exp) {
+                document.getElementById('mainPwd').value = pwd;
+                document.getElementById('uploadPwd').value = pwd;
+            }
         };
         function savePwd() {
             localStorage.setItem(PWD_KEY, document.getElementById('mainPwd').value);
