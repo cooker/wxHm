@@ -26,7 +26,9 @@
 </head>
 <body>
     <div style="text-align: right; margin-bottom: 15px;">
-    <a href="/admin/stats" style="color: #1890ff; font-size: 14px; text-decoration: none;">📈 查看数据趋势</a>
+    <a href="/admin/stats" style="color: #1890ff; font-size: 14px; text-decoration: none; margin-right: 15px;">📈 查看数据趋势</a>
+    <a href="/admin/upload-file" style="color: #1890ff; font-size: 14px; text-decoration: none; margin-right: 15px;">📁 上传自定义文件</a>
+    <a href="/admin/notice" style="color: #1890ff; font-size: 14px; text-decoration: none;">📢 微信公众号维护</a>
     </div>
     <div class="card">
         <h3 style="margin-top:0">管理中心</h3>
@@ -42,18 +44,6 @@
             <button type="submit">上传并发布</button>
         </form>
         
-        <div class="divider"></div>
-        
-        <div class="upload-section">
-            <h4 style="margin-top:0">📁 上传自定义文件</h4>
-            <form method="post" enctype="multipart/form-data" action="/upload" onsubmit="savePwd()">
-                <input type="password" name="password" id="uploadPwd" placeholder="管理密码" required>
-                <input type="file" name="file" required>
-                <label for="custom_name">自定义文件名（可选，留空则使用原文件名）：</label>
-                <input type="text" id="custom_name" name="custom_name" placeholder="例如: 34cd1443732dd2878beb10347c7d3da5.txt">
-                <button type="submit">上传文件</button>
-            </form>
-        </div>
     </div>
 
     <div style="width:100%; max-width:400px; margin-top:20px;">
@@ -78,8 +68,8 @@
             const pwd = localStorage.getItem(PWD_KEY);
             const exp = localStorage.getItem(EXPIRE_KEY);
             if (pwd && exp && new Date().getTime() < exp) {
-                document.getElementById('mainPwd').value = pwd;
-                document.getElementById('uploadPwd').value = pwd;
+                const mainPwd = document.getElementById('mainPwd');
+                if (mainPwd) mainPwd.value = pwd;
             }
         };
         function savePwd() {

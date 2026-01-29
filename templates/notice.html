@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>微信公众号维护</title>
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { width: 100%; max-width: 600px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        textarea { min-height: 100px; resize: vertical; font-family: monospace; }
+        button { background: #07c160; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #06ad56; }
+        .btn-secondary { background: #1890ff; }
+        .btn-secondary:hover { background: #40a9ff; }
+        .btn-danger { background: #ff4d4f; }
+        .btn-danger:hover { background: #ff7875; }
+        .btn-small { padding: 6px 12px; width: auto; font-size: 12px; margin: 0 5px; }
+        .msg { color: #ff4d4f; font-size: 13px; text-align: center; margin-bottom: 10px; }
+        .msg-success { color: #07c160; font-size: 13px; text-align: center; margin-bottom: 10px; }
+        label { display: block; margin-top: 12px; margin-bottom: 4px; font-size: 13px; color: #666; font-weight: 500; }
+        .form-group { margin-bottom: 15px; }
+        .back-link { text-align: right; margin-bottom: 15px; width: 100%; max-width: 600px; }
+        .back-link a { color: #1890ff; font-size: 14px; text-decoration: none; }
+        .back-link a:hover { text-decoration: underline; }
+        .help-text { font-size: 12px; color: #999; margin-top: 4px; }
+        .config-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .config-item h4 { margin: 0 0 10px 0; color: #333; }
+        .config-item .meta { font-size: 12px; color: #999; margin-bottom: 10px; }
+        .config-item .actions { margin-top: 10px; }
+        .divider { width: 100%; height: 1px; background: #eee; margin: 20px 0; }
+        .form-actions { display: flex; gap: 10px; }
+        .form-actions button { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="back-link">
+        <a href="/admin">← 返回管理后台</a>
+    </div>
+    
+    <!-- 密码验证 & 自动加载最新配置 -->
+    <div class="card">
+        <h3 style="margin-top:0">快速加载配置</h3>
+        <p style="font-size:13px;color:#666;margin-top:0;">
+            输入正确的管理密码后，点击“读取最新配置”，系统会自动加载最近一次更新的配置到下方表单中。
+        </p>
+        <form method="post" id="loadForm" onsubmit="savePwd()">
+            <input type="hidden" name="action" value="load">
+            <div class="form-group">
+                <label for="password_load">管理密码 <span style="color:red">*</span></label>
+                <input type="password" id="password_load" name="password" placeholder="请输入管理密码" required>
+            </div>
+            <button type="submit" class="btn-secondary">读取最新配置</button>
+        </form>
+    </div>
+
+    <!-- 配置列表 -->
+    {% if configs %}
+    <div class="card">
+        <h3 style="margin-top:0">已保存的配置</h3>
+        {% for config in configs %}
+        <div class="config-item">
+            <h4>{{ config.name }}</h4>
+            <div class="meta">
+                AppID: {{ config.appid[:20] }}... | 
+                模板ID: {{ config.template_id[:20] }}... | 
+                更新时间: {{ config.updated_at.strftime('%Y-%m-%d %H:%M') if config.updated_at else '' }}
+            </div>
+            <div class="actions">
+                <button class="btn-secondary btn-small" onclick="editConfig({{ config.id }})">编辑</button>
+                <button class="btn-small" onclick="sendMessage({{ config.id }})">发送</button>
+                <button class="btn-danger btn-small" onclick="deleteConfig({{ config.id }})">删除</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- 配置表单 -->
+    <div class="card">
+        <h3 style="margin-top:0">
+            {% if edit_config %}编辑配置{% else %}新增配置{% endif %}
+        </h3>
+        {% with msgs = get_flashed_messages() %}
+            {% if msgs %}
+                <p class="{% if '成功' in msgs[0] %}msg-success{% else %}msg{% endif %}">{{ msgs[0] }}</p>
+            {% endif %}
+        {% endwith %}
+        <form method="post" id="configForm" onsubmit="return submitConfigForm()">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="password" id="password_hidden">
+            {% if edit_config %}
+            <input type="hidden" name="config_id" value="{{ edit_config.id }}">
+            {% endif %}
+            
+            <div class="form-group">
+                <label for="appid">AppID <span style="color:red">*</span></label>
+                <input type="text" id="appid" name="appid" placeholder="例如: wx5a2929a3a7dae867" value="{% if edit_config %}{{ edit_config.appid }}{% endif %}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="secret">Secret <span style="color:red">*</span></label>
+                <input type="text" id="secret" name="secret" placeholder="请输入微信公众号Secret" value="{% if edit_config %}{{ edit_config.secret }}{% endif %}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="touser">用户ID (touser) <span style="color:red">*</span></label>
+                <input type="text" id="touser" name="touser" placeholder="例如: own8-3MtxTZc9oX4zQurMp_ijbg8" value="{% if edit_config %}{{ edit_config.touser }}{% endif %}" required>
+                <div class="help-text">接收消息的用户openid</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="template_id">模板ID (template_id) <span style="color:red">*</span></label>
+                <input type="text" id="template_id" name="template_id" placeholder="例如: 5luakFpKCJpVCp3DuP8NUQ4AqRqRuChw94uZZXthopw" value="{% if edit_config %}{{ edit_config.template_id }}{% endif %}" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="template_data">模板数据 (JSON格式) <span style="color:red">*</span></label>
+                <textarea id="template_data" name="template_data" placeholder='{"group": {"value": "111"}, "action": {"value": "111"}, "server": {"value": "111"}, "user": {"value": "111"}, "time": {"value": "111"}}' required>{% if edit_config %}{{ edit_config.template_data }}{% endif %}</textarea>
+                <div class="help-text">请输入JSON格式的模板数据，每个字段包含value属性</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="url">跳转链接 (可选)</label>
+                <input type="url" id="url" name="url" placeholder="https://example.com" value="{% if edit_config %}{{ edit_config.url or '' }}{% endif %}">
+                <div class="help-text">点击模板消息后跳转的链接，留空则不跳转</div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit">{% if edit_config %}更新配置{% else %}保存配置{% endif %}</button>
+                {% if edit_config %}
+                <button type="button" class="btn-secondary" onclick="cancelEdit()">取消</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    
+    <!-- 删除确认表单 -->
+    <form id="deleteForm" method="post" style="display:none">
+        <input type="password" name="password" id="deletePwd">
+    </form>
+    
+    <!-- 发送消息表单 -->
+    <form id="sendForm" method="post" style="display:none">
+        <input type="hidden" name="action" value="send">
+        <input type="hidden" name="config_id" id="sendConfigId">
+        <input type="password" name="password" id="sendPwd">
+    </form>
+
+    <script>
+        const PWD_KEY = 'wxhm_pwd';
+        const EXPIRE_KEY = 'wxhm_expire';
+        const APPID_KEY = 'wxhm_appid';
+        const SECRET_KEY = 'wxhm_secret';
+        
+        window.onload = () => {
+            // 恢复密码到「快速加载配置」的密码框
+            const pwd = localStorage.getItem(PWD_KEY);
+            const exp = localStorage.getItem(EXPIRE_KEY);
+            if (pwd && exp && new Date().getTime() < exp) {
+                const loadPwd = document.getElementById('password_load');
+                if (loadPwd) loadPwd.value = pwd;
+            }
+            
+            // 恢复appid和secret（仅在新增时）
+            {% if not edit_config %}
+            const appid = localStorage.getItem(APPID_KEY);
+            const secret = localStorage.getItem(SECRET_KEY);
+            if (appid) document.getElementById('appid').value = appid;
+            if (secret) document.getElementById('secret').value = secret;
+            {% endif %}
+            
+            // 设置默认模板数据示例（仅在新增且为空时）
+            {% if not edit_config %}
+            if (!document.getElementById('template_data').value) {
+                document.getElementById('template_data').value = JSON.stringify({
+                    "group": {"value": ""},
+                    "action": {"value": ""},
+                    "server": {"value": ""},
+                    "user": {"value": ""},
+                    "time": {"value": ""}
+                }, null, 2);
+            }
+            {% endif %}
+        };
+        
+        function submitConfigForm() {
+            var pwdEl = document.getElementById('password_load');
+            if (!pwdEl || !pwdEl.value) {
+                alert('请先在「快速加载配置」处输入管理密码');
+                return false;
+            }
+            document.getElementById('password_hidden').value = pwdEl.value;
+            localStorage.setItem(PWD_KEY, pwdEl.value);
+            localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            localStorage.setItem(APPID_KEY, document.getElementById('appid').value);
+            localStorage.setItem(SECRET_KEY, document.getElementById('secret').value);
+            return true;
+        }
+        
+        function savePwd() {
+            var pwdEl = document.getElementById('password_load');
+            if (pwdEl && pwdEl.value) {
+                localStorage.setItem(PWD_KEY, pwdEl.value);
+                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            }
+        }
+        
+        function editConfig(id) {
+            window.location.href = '/admin/notice?edit=' + id;
+        }
+        
+        function cancelEdit() {
+            window.location.href = '/admin/notice';
+        }
+        
+        function deleteConfig(id) {
+            if (confirm('确定要删除此配置吗？')) {
+                const pwd = localStorage.getItem(PWD_KEY);
+                if (pwd) {
+                    document.getElementById('deletePwd').value = pwd;
+                } else {
+                    const inputPwd = prompt('请输入管理密码:');
+                    if (!inputPwd) return;
+                    document.getElementById('deletePwd').value = inputPwd;
+                }
+                document.getElementById('deleteForm').action = '/admin/notice/delete/' + id;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+        
+        function sendMessage(id) {
+            if (confirm('确定要发送模板消息吗？')) {
+                const pwd = localStorage.getItem(PWD_KEY);
+                if (pwd) {
+                    document.getElementById('sendPwd').value = pwd;
+                } else {
+                    const inputPwd = prompt('请输入管理密码:');
+                    if (!inputPwd) return;
+                    document.getElementById('sendPwd').value = inputPwd;
+                }
+                document.getElementById('sendConfigId').value = id;
+                document.getElementById('sendForm').submit();
+            }
+        }
+    </script>
+</body>
+</html>
