@@ -1,4 +1,4 @@
-import os, time, shutil, urllib.parse, json
+import os, time, shutil, urllib.parse, json, threading
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -50,21 +50,14 @@ def get_latest_wechat_template():
     """获取最新一条微信公众号模板配置"""
     return WeChatTemplate.query.order_by(WeChatTemplate.updated_at.desc(), WeChatTemplate.id.desc()).first()
 
-def send_wechat_template_for_event(group_name: str, action: str, server_ip: str, user_label: str):
+def _send_wechat_template_sync(group_name: str, action: str, server_ip: str, user_label: str):
     """
-    按固定格式发送微信公众号模板消息
-    
-    模板字段含义:
-      - group: 群名
-      - action: 操作
-      - server: 服务器IP 或 访客IP
-      - user: 操作人员（管理员 / 访客 / 系统）
-      - time: 触发时间
+    按固定格式发送微信公众号模板消息（同步实现，供后台线程调用）
+    模板字段: group=群名, action=操作, server=服务器/访客IP, user=操作人员, time=触发时间
     """
     config = get_latest_wechat_template()
     if not config:
         return
-
     try:
         data = {
             "group": {"value": group_name or ""},
@@ -73,7 +66,6 @@ def send_wechat_template_for_event(group_name: str, action: str, server_ip: str,
             "user": {"value": user_label or ""},
             "time": {"value": datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         }
-
         wechat = WeChatAPI(appid=config.appid, secret=config.secret)
         wechat.send_template_message(
             touser=config.touser,
@@ -82,8 +74,18 @@ def send_wechat_template_for_event(group_name: str, action: str, server_ip: str,
             url=config.url
         )
     except Exception as e:
-        # 不影响主流程，只打印错误
         print(f"自动发送微信模板消息失败: {e}")
+
+
+def send_wechat_template_for_event(group_name: str, action: str, server_ip: str, user_label: str):
+    """
+    异步推送微信公众号模板消息，不阻塞当前请求。
+    """
+    def _run():
+        with app.app_context():
+            _send_wechat_template_sync(group_name, action, server_ip, user_label)
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
 
 @app.after_request
 def add_header(response):
