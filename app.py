@@ -18,7 +18,7 @@ db = SQLAlchemy(app)
 
 UPLOAD_BASE = 'uploads'
 FILES_DIR = os.path.join(UPLOAD_BASE, 'files')
-ADMIN_PASSWORD = 'admin123' 
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123') 
 EXPIRE_DAYS = 7             
 
 if not os.path.exists(UPLOAD_BASE): os.makedirs(UPLOAD_BASE)

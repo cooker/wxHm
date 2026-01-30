@@ -4,7 +4,7 @@
 
 # 📅 wxHm 项目变更日志与完整说明书
 
-本文件记录了 `wxHm` (WeChat LiveCode Manager) 从 v1.0 到 v1.5 的所有重大更新。
+本文件记录了 `wxHm` (WeChat LiveCode Manager) 从 v1.0 至今的所有重大更新。
 
 ---
 
@@ -40,6 +40,11 @@
   * 文件名即为上传文件名，自动生成外部访问链接（`https://域名/文件名`）；
   * 页面中列出所有已上传文件，并支持一键删除。
 * **[优化]** 管理中心群组列表与统计页中，隐藏 `files` 目录，仅展示真实群组。
+
+### v1.6.1 - 配置与推送优化
+
+* **[配置]** 管理密码支持通过环境变量 `ADMIN_PASSWORD` 自定义，未设置时默认 `admin123`，便于 Docker/生产环境不写死密码。
+* **[优化]** 微信公众号模板消息改为**异步推送**（后台线程发送），访问群码、管理员操作、群码过期等场景下请求立即返回，不阻塞主流程。
 
 ### v1.5.0 - 设备画像与环形图表
 
@@ -98,13 +103,21 @@ pip install -r requirements.txt
 
 ### 2. 关键配置
 
-1. 修改 `app.py` 中的后台管理密码：
+1. **管理密码**：通过环境变量 `ADMIN_PASSWORD` 设置，未设置时使用默认值 `admin123`。
 
-```python
-ADMIN_PASSWORD = 'admin123'  # 请修改为自己的强密码
-```
+   ```bash
+   export ADMIN_PASSWORD=你的强密码
+   ```
 
-2. （可选）配置微信公众号模板消息：
+   或在启动时传入：
+
+   ```bash
+   ADMIN_PASSWORD=你的强密码 python app.py
+   ```
+
+   Docker 部署时在 `docker-compose.yml` 或 `docker run -e ADMIN_PASSWORD=...` 中配置即可。
+
+2. **（可选）微信公众号模板消息**：
 
    * 打开 `/admin/notice` 页面；
    * 新增一条配置，填写 `appid / secret / touser / template_id`；
@@ -151,6 +164,14 @@ location / {
 
 ```bash
 docker-compose up -d
+```
+
+建议在 `docker-compose.yml` 中为服务配置环境变量，例如：
+
+```yaml
+environment:
+  - TZ=Asia/Shanghai
+  - ADMIN_PASSWORD=你的管理密码
 ```
 
 **B. 查看容器状态**
