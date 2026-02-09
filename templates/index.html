@@ -14,21 +14,48 @@
         @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
         .ok { color: #07c160; font-weight: bold; margin: 15px 0; }
         .hint { color: #888; font-size: 13px; }
+        /* 微信环境提示条 */
+        .wechat-tip { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: linear-gradient(135deg, #07c160 0%, #06ae56 100%); color: white; padding: 12px 16px; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; }
+        .wechat-tip.show { display: block; }
+        .wechat-tip strong { display: block; margin-bottom: 4px; }
+        .wechat-tip span { font-size: 12px; opacity: 0.95; }
+        /* 保存按钮 */
+        .btn-save { display: inline-block; margin-top: 12px; padding: 10px 24px; background: linear-gradient(135deg, #07c160 0%, #06ae56 100%); color: white; border: none; border-radius: 24px; font-size: 15px; text-decoration: none; box-shadow: 0 4px 12px rgba(7,193,96,0.3); transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(7,193,96,0.4); }
+        .btn-save:active { transform: translateY(0); }
     </style>
 </head>
 <body>
+    <!-- 微信环境提示：请用浏览器打开 -->
+    <div id="wechatTip" class="wechat-tip">
+        <strong>建议使用浏览器打开</strong>
+        <span>检测到您在微信内打开，为获得更好体验，请点击右上角「···」选择「在浏览器中打开」或「在 Safari/Chrome 中打开」</span>
+    </div>
+
     <div class="card">
         <h3>{{ group_name }}</h3>
         {% if qr_file %}
             <div class="qr-box">
                 <div class="scanner"></div>
-                <img src="{{ wsrv_url }}" class="qr-img" onerror="this.src='/uploads/{{ group_name }}/{{ qr_file }}'">
+                <img id="qrImg" src="{{ wsrv_url }}" class="qr-img" onerror="this.src='/uploads/{{ group_name }}/{{ qr_file }}'" alt="群二维码">
             </div>
             <p class="ok">● 入口已激活</p>
             <p class="hint">长按上方二维码识别并加入群聊</p>
+            <a class="btn-save" href="/uploads/{{ group_name }}/{{ qr_file }}" download="{{ group_name }}_群二维码.webp">保存到本地</a>
         {% else %}
             <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效二维码</p>
         {% endif %}
     </div>
+
+    <script>
+        (function() {
+            // 检测微信内置浏览器
+            var ua = navigator.userAgent.toLowerCase();
+            if (ua.indexOf('micromessenger') !== -1) {
+                document.getElementById('wechatTip').classList.add('show');
+                document.body.style.paddingTop = '90px';
+            }
+        })();
+    </script>
 </body>
 </html>
