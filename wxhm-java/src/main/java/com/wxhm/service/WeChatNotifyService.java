@@ -1,11 +1,9 @@
 package com.wxhm.service;
 
-import com.wxhm.config.WxHmProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wxhm.entity.WeChatTemplate;
 import com.wxhm.repository.WeChatTemplateRepository;
 import com.wxhm.wechat.WeChatApi;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 

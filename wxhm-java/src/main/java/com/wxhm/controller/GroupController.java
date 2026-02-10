@@ -1,9 +1,10 @@
 package com.wxhm.controller;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-
+import com.wxhm.config.WxHmProperties;
+import com.wxhm.service.QrService;
+import com.wxhm.service.WeChatNotifyService;
+import com.wxhm.util.PlatformUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
@@ -13,12 +14,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import com.wxhm.config.WxHmProperties;
-import com.wxhm.service.QrService;
-import com.wxhm.service.WeChatNotifyService;
-import com.wxhm.util.PlatformUtils;
-
-import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 /**
  * 群码展示、静态资源
