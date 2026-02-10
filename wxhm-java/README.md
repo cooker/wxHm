@@ -80,6 +80,11 @@ wxhm-java/
 - 使用 RestTemplate 调用微信 API
 - 群码保存优先 WebP，失败时降级为 PNG
 
+## Mac（含 Apple Silicon）说明
+
+- 群码上传会优先尝试保存为 WebP；若当前环境 WebP 原生库不可用（如 Mac ARM64 下 `webp-imageio` 仅含 x86_64 导致 `UnsatisfiedLinkError`），会**自动回退为 PNG**，上传功能正常可用。
+- 图片会统一转为 RGB 再保存，兼容 RGBA、P 等格式。
+
 ## 项目地址
 
 原项目: [https://github.com/cooker/wxHm](https://github.com/cooker/wxHm)

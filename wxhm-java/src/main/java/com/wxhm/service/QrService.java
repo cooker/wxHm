@@ -4,11 +4,11 @@ import com.wxhm.config.WxHmProperties;
 import com.wxhm.entity.VisitLog;
 import com.wxhm.repository.VisitLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.*;
@@ -67,7 +67,7 @@ public class QrService {
                             .anyMatch(ext -> p.getFileName().toString().toLowerCase().endsWith(ext)))
                     .sorted(Comparator.comparingLong(p -> {
                         try {
-                            return Files.getLastModifiedTime(p).toMillis();
+                            return Files.getLastModifiedTime((Path) p).toMillis();
                         } catch (IOException e) {
                             return 0L;
                         }
@@ -90,7 +90,7 @@ public class QrService {
     }
 
     /**
-     * 保存上传的群码图片，转为 WebP
+     * 保存上传的群码图片，优先转为 WebP；Mac ARM64 等环境下 native 库不可用时自动回退为 PNG。
      */
     public void saveGroupQr(String groupName, byte[] imageBytes) throws IOException {
         Path groupPath = properties.getGroupPath(groupName);
@@ -100,26 +100,39 @@ public class QrService {
         if (image == null) {
             throw new IOException("无法解析图片");
         }
-        // RGBA/P 转 RGB
-        if (image.getType() == BufferedImage.TYPE_4BYTE_ABGR || image.getColorModel().getNumColorComponents() == 4) {
-            BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
-            rgb.createGraphics().drawImage(image, 0, 0, Color.WHITE, null);
-            image = rgb;
-        }
+        // 统一转为 RGB（含 RGBA、P、带透明通道等），避免部分格式在部分平台上写入异常
+        image = ensureRgb(image);
 
-        String filename = "qr_" + System.currentTimeMillis() + ".webp";
-        Path outputPath = groupPath.resolve(filename);
+        String baseName = "qr_" + System.currentTimeMillis();
+        Path outputPath = groupPath.resolve(baseName + ".webp");
         try {
-            if (!ImageIO.write(image, "webp", outputPath.toFile())) {
-                filename = filename.replace(".webp", ".png");
-                outputPath = groupPath.resolve(filename);
-                ImageIO.write(image, "png", outputPath.toFile());
+            if (ImageIO.write(image, "webp", outputPath.toFile())) {
+                return;
             }
-        } catch (IOException e) {
-            filename = filename.replace(".webp", ".png");
-            outputPath = groupPath.resolve(filename);
-            ImageIO.write(image, "png", outputPath.toFile());
+        } catch (Throwable t) {
+            // WebP 依赖 native 库，Mac ARM64 上可能为 x86_64 导致 UnsatisfiedLinkError，回退为 PNG
+            System.err.println("WebP 写入失败，回退为 PNG: " + t.getMessage());
         }
+        outputPath = groupPath.resolve(baseName + ".png");
+        if (!ImageIO.write(image, "png", outputPath.toFile())) {
+            throw new IOException("无法保存为 PNG");
+        }
+    }
+
+    private static BufferedImage ensureRgb(BufferedImage image) {
+        if (image.getType() == BufferedImage.TYPE_INT_RGB && image.getColorModel().getNumColorComponents() == 3) {
+            return image;
+        }
+        BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = rgb.createGraphics();
+        try {
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            g.drawImage(image, 0, 0, null);
+        } finally {
+            g.dispose();
+        }
+        return rgb;
     }
 
     public List<String> listGroups() {
