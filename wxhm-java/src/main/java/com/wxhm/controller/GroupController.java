@@ -1,13 +1,11 @@
 package com.wxhm.controller;
 
-import com.wxhm.config.WxHmProperties;
-import com.wxhm.service.QrService;
-import com.wxhm.service.WeChatNotifyService;
-import com.wxhm.util.PlatformUtils;
-import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -15,9 +13,12 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
+import com.wxhm.config.WxHmProperties;
+import com.wxhm.service.QrService;
+import com.wxhm.service.WeChatNotifyService;
+import com.wxhm.util.PlatformUtils;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 群码展示、静态资源
