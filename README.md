@@ -188,6 +188,20 @@ docker logs -f wxhm_app
 
 ---
 
+## ☁️ 使用 Cloudflare Workers 部署（绑定 CF 域名）
+
+若需将 wxHm 绑定到 Cloudflare 域名，并支持非标准端口（如 8092），可使用项目内的 `cf-workers/` 反向代理：
+
+```bash
+cd cf-workers
+npx wrangler secret put ORIGIN_URL   # 输入后端地址，如 http://your-server:8092
+npx wrangler deploy
+```
+
+随后在 CF 控制台为 Worker 添加自定义域名即可。详见 [cf-workers/README.md](cf-workers/README.md)。
+
+---
+
 ## ❓ 常见问题 (FAQ)
 
 ### 1. 微信公众号模板消息发不出去怎么办？

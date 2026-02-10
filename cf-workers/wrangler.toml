@@ -1,0 +1,19 @@
+# wxHm Cloudflare Workers 配置
+# 部署: npx wrangler deploy
+# 文档: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "wxhm-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# 默认后端地址（生产环境务必用 wrangler secret 覆盖）
+# 示例: http://your-vps-ip:8092 或 https://wxhm-tunnel.yourdomain.com（Cloudflare Tunnel）
+# 注意：必须是 Worker 能访问的公网地址，不能填 localhost
+[vars]
+ORIGIN_URL_DEFAULT = ""
+
+# 自定义域名绑定（在 CF 控制台 Workers & Pages -> 域名 中添加更直观）
+# 或使用 workers.dev: https://wxhm-proxy.<your-account>.workers.dev
+# routes = [
+#   { pattern = "wxhm.yourdomain.com", zone_name = "yourdomain.com" }
+# ]
