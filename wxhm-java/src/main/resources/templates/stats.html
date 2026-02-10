@@ -4,18 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>流量分析看板</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
         .chart-row { display: flex; flex-wrap: wrap; gap: 20px; }
         .trend-box { flex: 2; min-width: 300px; height: 350px; }
         .pie-box { flex: 1; min-width: 250px; height: 350px; }
-        .header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; max-width: 1000px; margin: 0 auto 20px; }
+        .refresh-bar { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+        .refresh-bar select { padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd; }
+        .refresh-bar button { padding: 6px 14px; border-radius: 6px; border: 1px solid #07c160; background: #07c160; color: white; cursor: pointer; }
+        .refresh-bar button:hover { opacity: 0.9; }
+        .refresh-bar label { display: flex; align-items: center; gap: 6px; }
     </style>
 </head>
 <body>
-    <div class="header"><h3>7日数据看板</h3><a href="/admin" style="color:#07c160; text-decoration:none;">返回后台</a></div>
+    <div class="header">
+        <h3 style="margin:0;">7日数据看板</h3>
+        <div class="refresh-bar">
+            <label><input type="checkbox" id="autoRefresh"> 自动刷新</label>
+            <select id="refreshInterval">
+                <option value="5">5 秒</option>
+                <option value="15" selected>15 秒</option>
+                <option value="120">2 分钟</option>
+            </select>
+            <button type="button" id="btnRefresh">手动刷新</button>
+        </div>
+    </div>
     <div style="max-width:1000px; margin:0 auto;">
         <th:block th:each="item, iter : ${statsList}">
             <div class="card">
@@ -25,31 +40,114 @@
                     <div th:id="'pie_' + ${iter.index}" class="pie-box"></div>
                 </div>
             </div>
-            <script th:inline="javascript">
-                (function() {
-                    const idx = /*[[${iter.index}]]*/ 0;
-                    const trendData = /*[(${item.trendJson})]*/ [];
-                    const pieData = /*[(${item.pieJson})]*/ [];
-                    const trendChart = echarts.init(document.getElementById('trend_' + idx));
-                    trendChart.setOption({
-                        tooltip: { trigger: 'axis' },
-                        legend: { data: ['PV', 'UV'], bottom: 0 },
-                        xAxis: { type: 'category', data: trendData.map(i => i.date ? i.date.slice(5) : '') },
-                        yAxis: { type: 'value' },
-                        series: [
-                            { name: 'PV', type: 'line', smooth: true, areaStyle: {opacity: 0.1}, data: trendData.map(i => i.pv), itemStyle: {color: '#1890ff'} },
-                            { name: 'UV', type: 'line', smooth: true, data: trendData.map(i => i.uv), itemStyle: {color: '#07c160'} }
-                        ]
-                    });
-                    const pieChart = echarts.init(document.getElementById('pie_' + idx));
-                    pieChart.setOption({
-                        title: { text: '今日设备分布', left: 'center', textStyle: {fontSize: 13, color: '#999'} },
-                        tooltip: { trigger: 'item' },
-                        series: [{ type: 'pie', radius: ['40%', '70%'], data: pieData.length ? pieData : [{name: '无数据', value: 0}], itemStyle: {borderRadius: 5} }]
-                    });
-                })();
-            </script>
         </th:block>
     </div>
+
+    <script th:inline="javascript">
+    (function() {
+        var chartData = /*[(${chartDataJson})]*/ [];
+        var trendCharts = [];
+        var pieCharts = [];
+
+        function loadEcharts(callback) {
+            if (window.echarts) { callback(); return; }
+            var urls = [
+                'https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js',
+                'https://unpkg.com/echarts@5.4.3/dist/echarts.min.js'
+            ];
+            var i = 0;
+            function tryNext() {
+                if (i >= urls.length) { callback(); return; }
+                var s = document.createElement('script');
+                s.src = urls[i];
+                s.onload = callback;
+                s.onerror = function() { i++; tryNext(); };
+                document.head.appendChild(s);
+            }
+            tryNext();
+        }
+
+        function applyChartData(data) {
+            if (!window.echarts || !data || !Array.isArray(data)) return;
+            for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                var trendArr = Array.isArray(item.trend) ? item.trend : [];
+                var pieArr = Array.isArray(item.pie) ? item.pie : [];
+                if (trendCharts[i]) {
+                    trendCharts[i].setOption({
+                        xAxis: { type: 'category', data: trendArr.map(function(t) { return t && t.date ? String(t.date).slice(5) : ''; }) },
+                        series: [
+                            { name: 'PV', type: 'line', smooth: true, areaStyle: { opacity: 0.1 }, data: trendArr.map(function(t) { return t ? t.pv : 0; }), itemStyle: { color: '#1890ff' } },
+                            { name: 'UV', type: 'line', smooth: true, data: trendArr.map(function(t) { return t ? t.uv : 0; }), itemStyle: { color: '#07c160' } }
+                        ]
+                    }, { replaceMerge: ['series'] });
+                }
+                if (pieCharts[i]) {
+                    pieCharts[i].setOption({
+                        series: [{ type: 'pie', radius: ['40%', '70%'], data: pieArr.length ? pieArr : [{ name: '无数据', value: 0 }], itemStyle: { borderRadius: 5 } }]
+                    }, { replaceMerge: ['series'] });
+                }
+            }
+        }
+
+        function initCharts() {
+            if (!window.echarts) return;
+            trendCharts.length = 0;
+            pieCharts.length = 0;
+            for (var i = 0; i < chartData.length; i++) {
+                var trendEl = document.getElementById('trend_' + i);
+                var pieEl = document.getElementById('pie_' + i);
+                if (!trendEl || !pieEl) continue;
+                var trendChart = echarts.init(trendEl);
+                var trendArr = chartData[i].trend || [];
+                trendChart.setOption({
+                    tooltip: { trigger: 'axis' },
+                    legend: { data: ['PV', 'UV'], bottom: 0 },
+                    xAxis: { type: 'category', data: trendArr.map(function(t) { return t.date ? t.date.slice(5) : ''; }) },
+                    yAxis: { type: 'value' },
+                    series: [
+                        { name: 'PV', type: 'line', smooth: true, areaStyle: {opacity: 0.1}, data: trendArr.map(function(t) { return t.pv; }), itemStyle: {color: '#1890ff'} },
+                        { name: 'UV', type: 'line', smooth: true, data: trendArr.map(function(t) { return t.uv; }), itemStyle: {color: '#07c160'} }
+                    ]
+                });
+                trendCharts.push(trendChart);
+                var pieChart = echarts.init(pieEl);
+                var pieArr = chartData[i].pie || [];
+                pieChart.setOption({
+                    title: { text: '今日设备分布', left: 'center', textStyle: {fontSize: 13, color: '#999'} },
+                    tooltip: { trigger: 'item' },
+                    series: [{ type: 'pie', radius: ['40%', '70%'], data: pieArr.length ? pieArr : [{name: '无数据', value: 0}], itemStyle: {borderRadius: 5} }]
+                });
+                pieCharts.push(pieChart);
+            }
+        }
+
+        function fetchAndUpdate() {
+            fetch('/admin/stats/data')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    applyChartData(data);
+                })
+                .catch(function() {});
+        }
+
+        loadEcharts(initCharts);
+
+        var autoRefreshTimer = null;
+        document.getElementById('btnRefresh').onclick = function() { fetchAndUpdate(); };
+        document.getElementById('autoRefresh').onchange = function() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            if (!this.checked) return;
+            var sec = parseInt(document.getElementById('refreshInterval').value, 10);
+            autoRefreshTimer = setInterval(fetchAndUpdate, sec * 1000);
+        };
+        document.getElementById('refreshInterval').onchange = function() {
+            if (!document.getElementById('autoRefresh').checked) return;
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            var sec = parseInt(this.value, 10);
+            autoRefreshTimer = setInterval(fetchAndUpdate, sec * 1000);
+        };
+    })();
+    </script>
 </body>
 </html>

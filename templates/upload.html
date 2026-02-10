@@ -45,6 +45,16 @@
     </div>
 
     <div class="card">
+        <h3 style="margin-top:0">📋 粘贴样式创建文件</h3>
+        <p style="font-size:12px; color:#666; margin:0 0 10px 0;">粘贴包含 <code>##文本内容</code> … <code>##</code> 的文本，每行格式：<strong>文件名 内容</strong>（第一个空格前为文件名，后面为文件内容）。使用上方同一管理密码。</p>
+        <form method="post" action="/admin/upload-file/paste" onsubmit="var p=document.getElementById('uploadPwd'); if(!p.value){alert('请先在上方输入管理密码'); return false;} savePwd(); document.getElementById('pastePwd').value=p.value;">
+            <input type="hidden" name="password" id="pastePwd">
+            <textarea name="paste_content" rows="8" placeholder="##文本内容&#10;c6797e1cf950c96f53aa5acc6f7dd07a.txt 79bd3278b8feb70b7331bf369d4e57e171bedc65&#10;##" style="width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:monospace; font-size:13px;"></textarea>
+            <button type="submit">解析并创建文件</button>
+        </form>
+    </div>
+
+    <div class="card">
         <h3 style="margin-top:0">📄 已上传文件</h3>
         {% if files %}
             <ul class="file-list">
@@ -73,8 +83,11 @@
             const exp = localStorage.getItem(EXPIRE_KEY);
             if (pwd && exp && new Date().getTime() < exp) {
                 const uploadPwd = document.getElementById('uploadPwd');
-                if (uploadPwd) uploadPwd.value = pwd;
+                const pastePwd = document.getElementById('pastePwd');
                 const deletePwd = document.getElementById('deletePwd');
+                if (uploadPwd) uploadPwd.value = pwd;
+                var pastePwd = document.getElementById('pastePwd');
+                if (pastePwd) pastePwd.value = pwd;
                 if (deletePwd) deletePwd.value = pwd;
             }
         };

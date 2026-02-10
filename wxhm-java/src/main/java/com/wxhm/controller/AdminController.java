@@ -135,15 +135,36 @@ public class AdminController {
     public String stats(Model model) throws com.fasterxml.jackson.core.JsonProcessingException {
         var statsData = statsService.getStatsData();
         var statsList = new java.util.ArrayList<Map<String, Object>>();
+        var chartDataList = new java.util.ArrayList<Map<String, Object>>();
         for (var e : statsData.entrySet()) {
             var item = new java.util.HashMap<String, Object>();
             item.put("groupName", e.getKey());
             item.put("trendJson", objectMapper.writeValueAsString(e.getValue().get("trend")));
             item.put("pieJson", objectMapper.writeValueAsString(e.getValue().get("pie")));
             statsList.add(item);
+            var chartEntry = new java.util.HashMap<String, Object>();
+            chartEntry.put("trend", e.getValue().get("trend"));
+            chartEntry.put("pie", e.getValue().get("pie"));
+            chartDataList.add(chartEntry);
         }
         model.addAttribute("statsList", statsList);
+        model.addAttribute("chartDataJson", objectMapper.writeValueAsString(chartDataList));
         return "stats";
+    }
+
+    /** 统计看板数据接口，用于无感刷新（仅返回图表数据 JSON） */
+    @GetMapping("/admin/stats/data")
+    @ResponseBody
+    public List<Map<String, Object>> statsData() {
+        var statsData = statsService.getStatsData();
+        var chartDataList = new java.util.ArrayList<Map<String, Object>>();
+        for (var e : statsData.entrySet()) {
+            var chartEntry = new java.util.HashMap<String, Object>();
+            chartEntry.put("trend", e.getValue().get("trend"));
+            chartEntry.put("pie", e.getValue().get("pie"));
+            chartDataList.add(chartEntry);
+        }
+        return chartDataList;
     }
 
     // ==================== 自定义文件 ====================
@@ -187,6 +208,73 @@ public class AdminController {
             ra.addFlashAttribute("message", "上传成功！文件已保存为: " + filename);
         } catch (IOException e) {
             ra.addFlashAttribute("message", "上传失败: " + e.getMessage());
+        }
+        return "redirect:/admin/upload-file";
+    }
+
+    /**
+     * 粘贴样式创建文件：解析「##文本内容」与「##」之间的内容，每行格式为「文件名 内容」。
+     */
+    @PostMapping("/admin/upload-file/paste")
+    public String pasteAndCreateFiles(@RequestParam String password,
+                                      @RequestParam String paste_content,
+                                      RedirectAttributes ra) {
+        if (!checkPassword(password)) {
+            ra.addFlashAttribute("message", "密码错误");
+            return "redirect:/admin/upload-file";
+        }
+        if (paste_content == null || paste_content.isBlank()) {
+            ra.addFlashAttribute("message", "请粘贴文本内容");
+            return "redirect:/admin/upload-file";
+        }
+        String text = paste_content.trim();
+        // 若包含 ##文本内容 ... ##，只解析该区间
+        int start = text.indexOf("##文本内容");
+        if (start >= 0) {
+            start = text.indexOf("\n", start) + 1;
+            if (start <= 0) start = 0;
+        } else {
+            start = 0;
+        }
+        int end = text.indexOf("##", start);
+        if (end > start) {
+            text = text.substring(start, end).trim();
+        } else if (start > 0) {
+            text = text.substring(start).trim();
+        }
+        int created = 0;
+        StringBuilder errors = new StringBuilder();
+        for (String line : text.split("\n")) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            int firstSpace = line.indexOf(' ');
+            String filename;
+            String content;
+            if (firstSpace <= 0) {
+                filename = line;
+                content = "";
+            } else {
+                filename = line.substring(0, firstSpace).trim();
+                content = line.substring(firstSpace + 1);
+            }
+            filename = java.nio.file.Paths.get(filename).getFileName().toString();
+            if (filename.isBlank()) continue;
+            try {
+                java.nio.file.Path dest = qrService.getFilePath(filename);
+                java.nio.file.Files.createDirectories(dest.getParent());
+                java.nio.file.Files.writeString(dest, content, java.nio.charset.StandardCharsets.UTF_8);
+                created++;
+            } catch (IOException e) {
+                if (errors.length() > 0) errors.append("；");
+                errors.append(filename).append(": ").append(e.getMessage());
+            }
+        }
+        if (created > 0) {
+            ra.addFlashAttribute("message", "成功创建 " + created + " 个文件" + (errors.length() > 0 ? "，部分失败: " + errors : ""));
+        } else if (errors.length() > 0) {
+            ra.addFlashAttribute("message", "创建失败: " + errors);
+        } else {
+            ra.addFlashAttribute("message", "未解析到有效行，请按「文件名 内容」每行一条粘贴");
         }
         return "redirect:/admin/upload-file";
     }

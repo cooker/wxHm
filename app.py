@@ -160,6 +160,7 @@ def group_page(group_name):
 # --- 路由：统计看板 ---
 @app.route('/admin/stats')
 def stats():
+    db.create_all()  # 若 stats.db 不存在则自动创建库表
     today = datetime.now().strftime('%Y-%m-%d')
     dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     dates.reverse()
@@ -242,6 +243,59 @@ def upload_page():
             if os.path.isfile(os.path.join(FILES_DIR, f))
         ])
     return render_template('upload.html', files=files)
+
+@app.route('/admin/upload-file/paste', methods=['POST'])
+def paste_and_create_files():
+    """粘贴样式创建文件：解析「##文本内容」与「##」之间的内容，每行格式为「文件名 内容」。"""
+    if request.form.get('password') != ADMIN_PASSWORD:
+        flash('密码错误')
+        return redirect(url_for('upload_page'))
+    text = (request.form.get('paste_content') or '').strip()
+    if not text:
+        flash('请粘贴文本内容')
+        return redirect(url_for('upload_page'))
+    # 若包含 ##文本内容 ... ##，只解析该区间
+    start = text.find('##文本内容')
+    if start >= 0:
+        start = text.find('\n', start) + 1
+        if start <= 0:
+            start = 0
+    else:
+        start = 0
+    end = text.find('##', start)
+    if end > start:
+        text = text[start:end].strip()
+    elif start > 0:
+        text = text[start:].strip()
+    created = 0
+    errors = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        first_space = line.find(' ')
+        if first_space <= 0:
+            filename, content = line, ''
+        else:
+            filename, content = line[:first_space].strip(), line[first_space + 1:]
+        safe_name = os.path.basename(filename)
+        if not safe_name:
+            continue
+        path = os.path.join(FILES_DIR, safe_name)
+        try:
+            os.makedirs(FILES_DIR, exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            created += 1
+        except Exception as e:
+            errors.append(f'{safe_name}: {e}')
+    if created > 0:
+        flash(f'成功创建 {created} 个文件' + ('，部分失败: ' + '; '.join(errors) if errors else ''))
+    elif errors:
+        flash('创建失败: ' + '; '.join(errors))
+    else:
+        flash('未解析到有效行，请按「文件名 内容」每行一条粘贴')
+    return redirect(url_for('upload_page'))
 
 @app.route('/admin/upload-file/delete', methods=['POST'])
 def delete_uploaded_file():
