@@ -1,16 +1,17 @@
 # wxHm Cloudflare Workers 反向代理
 
-将 CF 域名流量转发到 wxHm 后端服务，**支持非标准端口（如 8092）**，解决 CF 仅支持 80/443 等有限端口的问题。
+使用 **Cloudflare Workers** 实现类似 **Nginx** 的反向代理：访问绑定域名时，将请求转发到 wxHm 后端（如 `http://117.72.103.32:8092`），支持非标准端口 8092。
 
 ## 架构
 
 ```
-用户 → CF 域名(HTTPS:443) → Worker → 后端服务(HTTP:8092)
+用户访问 https://你的域名  →  Worker  →  http://117.72.103.32:8092
 ```
 
-- 用户访问 `https://wxhm.yourdomain.com`（或 workers.dev 子域）
-- Worker 转发到配置的后端地址（如 `http://your-server:8092`）
-- 透传 `X-Forwarded-For`、`X-Forwarded-Proto`、`Host`，与 Nginx/CF 代理行为一致
+- 用户访问 `https://wxhm.yourdomain.com` 或 `https://wxhm-proxy.xxx.workers.dev`
+- Worker 将路径、查询、方法、Body、常用头原样转发到 `ORIGIN_URL_DEFAULT`（当前为 `http://117.72.103.32:8092`）
+- 透传 `X-Forwarded-For`、`X-Forwarded-Proto`，并设置 `Host` 为访问域名，避免后端报「Direct IP access not allowed」
+- 后端返回的 `Location` 重定向会改写为当前域名，避免跳回 IP
 
 ## 部署步骤
 
@@ -83,3 +84,9 @@ Worker 需要能访问你的后端，常见方式：
 ## 验证
 
 部署后访问 `https://你的域名/`，应看到 wxHm 首页；访问 `/group/群组名` 可测试群码页。
+
+## 常见问题
+
+### 出现 "Direct IP access not allowed"
+
+当后端或前置代理拒绝「直连 IP」请求时会返回该提示。Worker 已改为将 **用户访问的域名**（如 `wxhm.yourdomain.com` 或 `wxhm-proxy.xxx.workers.dev`）作为 `Host` 头转发给后端，而不是后端地址里的 IP/主机名，从而避免被判定为直连 IP。若仍出现，请检查后端或 Nginx 是否对 `Host` 做了白名单限制，并放行你绑定的 CF 域名。
