@@ -19,8 +19,8 @@ spring:
 
 # wxHm 配置
 wxhm:
-  upload-base: uploads
-  files-dir: uploads/files
+  upload-base: /opt/wxHm/uploads
+  files-dir: /opt/wxHm/uploads/files
   admin-password: ${ADMIN_PASSWORD:admin321}
   expire-days: 7
   github-url: https://github.com/cooker/wxHm

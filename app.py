@@ -1,4 +1,4 @@
-import os, time, shutil, urllib.parse, json, threading
+import os, time, shutil, urllib.parse, json, threading, io
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -200,19 +200,33 @@ def admin():
             if g_name and file:
                 g_dir = os.path.join(UPLOAD_BASE, g_name)
                 if not os.path.exists(g_dir): os.makedirs(g_dir)
-                img = Image.open(file)
-                if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                img.save(os.path.join(g_dir, f"qr_{int(time.time())}.webp"), "WEBP", quality=80)
-                flash("更新成功")
-
-                # 管理员更新群码，发送通知
-                admin_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
-                send_wechat_template_for_event(
-                    group_name=g_name,
-                    action='管理员更新群码',
-                    server_ip=admin_ip,
-                    user_label='管理员'
-                )
+                try:
+                    # 读入内存再解码，避免 Mac 上流式读取导致的兼容问题
+                    data = file.read()
+                    img = Image.open(io.BytesIO(data)).copy()
+                    img.load()
+                    # 统一转为 RGB（含 RGBA/P/LA/CMYK 等）
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+                    base_name = f"qr_{int(time.time())}"
+                    out_path_webp = os.path.join(g_dir, base_name + ".webp")
+                    try:
+                        img.save(out_path_webp, "WEBP", quality=80)
+                    except (OSError, IOError):
+                        # Mac 上若 Pillow 未带 WebP 支持则回退为 PNG
+                        out_path_webp = os.path.join(g_dir, base_name + ".png")
+                        img.save(out_path_webp, "PNG")
+                    flash("更新成功")
+                    admin_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+                    send_wechat_template_for_event(
+                        group_name=g_name,
+                        action='管理员更新群码',
+                        server_ip=admin_ip,
+                        user_label='管理员'
+                    )
+                except Exception as e:
+                    flash(f"图片处理失败: {str(e)}")
+                    return redirect(url_for('admin'))
         else:
             flash("密码错误")
         return redirect(url_for('admin'))

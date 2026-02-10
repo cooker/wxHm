@@ -182,6 +182,7 @@ public class AdminController {
         filename = java.nio.file.Paths.get(filename).getFileName().toString();
         try {
             java.nio.file.Path dest = qrService.getFilePath(filename);
+            java.nio.file.Files.createDirectories(dest.getParent());
             file.transferTo(dest.toFile());
             ra.addFlashAttribute("message", "上传成功！文件已保存为: " + filename);
         } catch (IOException e) {
