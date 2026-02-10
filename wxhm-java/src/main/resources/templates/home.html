@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wxHm - 智能微信活码管理系统</title>
+    <style>
+        :root { --primary: #07c160; --dark: #1a1a1a; }
+        body { font-family: -apple-system, sans-serif; margin: 0; background: #fff; color: var(--dark); line-height: 1.6; }
+        .hero { padding: 80px 20px; text-align: center; background: linear-gradient(135deg, #f6fff9 0%, #ffffff 100%); }
+        .badge { background: #e8f9f0; color: var(--primary); padding: 5px 15px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        h1 { font-size: 42px; margin: 20px 0; letter-spacing: -1px; }
+        .desc { color: #666; max-width: 600px; margin: 0 auto 30px; font-size: 18px; }
+        .btns { display: flex; justify-content: center; gap: 15px; }
+        .btn { padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 500; transition: 0.3s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { border: 1px solid #ddd; color: var(--dark); }
+        .btn:hover { opacity: 0.8; transform: translateY(-2px); }
+        .features { padding: 60px 20px; max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; }
+        .f-card { padding: 20px; border: 1px solid #eee; border-radius: 12px; }
+        .f-card h3 { color: var(--primary); margin-top: 0; }
+        footer { text-align: center; padding: 40px; color: #aaa; font-size: 14px; border-top: 1px solid #f5f5f5; }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <span class="badge">Open Source Project</span>
+        <h1>wxHm 智能活码系统</h1>
+        <p class="desc">解决微信群二维码 7 天有效期限制，集成 CDN 加速与实时数据看板的私有化部署解决方案。</p>
+        <div class="btns">
+            <a th:href="${githubUrl}" target="_blank" class="btn btn-outline">GitHub 源码</a>
+            <a href="https://hapgpt.com" class="btn btn-primary">博客</a>
+        </div>
+    </section>
+
+    <div class="features">
+        <div class="f-card">
+            <h3>🚀 CDN 加速</h3>
+            <p>集成 wsrv.nl 全球镜像，通过 WebP 格式自动压缩，让扫码体验提升 200%。</p>
+        </div>
+        <div class="f-card">
+            <h3>📊 实时看板</h3>
+            <p>内置 ECharts 流量看板，支持查看 7 日 PV/UV 趋势及访问设备指纹。</p>
+        </div>
+        <div class="f-card">
+            <h3>🔒 私有部署</h3>
+            <p>轻量级 Spring Boot + SQLite 架构，支持 Docker 一键部署，数据完全自主掌控。</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 wxHm Project. 基于 MIT 协议开源.</p>
+    </footer>
+</body>
+</html>

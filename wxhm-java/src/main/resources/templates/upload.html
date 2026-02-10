@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>上传自定义文件</title>
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { width: 100%; max-width: 500px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { background: #07c160; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .btn-danger { background: #ff4d4f; }
+        .btn-danger:hover { background: #ff7875; }
+        .btn-small { width: auto; padding: 6px 12px; font-size: 12px; margin-left: 8px; }
+        .msg { color: #ff4d4f; font-size: 13px; text-align: center; }
+        .msg-success { color: #07c160; font-size: 13px; text-align: center; }
+        .back-link { text-align: right; margin-bottom: 15px; width: 100%; max-width: 500px; }
+        .back-link a { color: #1890ff; font-size: 14px; text-decoration: none; }
+        .file-list { list-style: none; padding: 0; margin: 10px 0 0 0; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .file-item a { color: #1890ff; text-decoration: none; word-break: break-all; }
+        .file-empty { font-size: 13px; color: #999; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="back-link">
+        <a href="/admin">← 返回管理后台</a>
+    </div>
+    <div class="card">
+        <h3 style="margin-top:0">📁 上传自定义文件</h3>
+        <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
+        <form method="post" enctype="multipart/form-data" action="/upload" onsubmit="savePwd()">
+            <input type="password" name="password" id="uploadPwd" placeholder="管理密码" required>
+            <input type="file" name="file" required>
+            <button type="submit">上传文件</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">📄 已上传文件</h3>
+        <th:block th:if="${files != null and !files.isEmpty()}">
+            <ul class="file-list">
+                <li th:each="f : ${files}" class="file-item">
+                    <a th:href="@{/{name}(name=${f})}" th:text="${f}" target="_blank">文件名</a>
+                    <button class="btn-danger btn-small" type="button" th:attr="data-filename=${f}" onclick="deleteFile(this.dataset.filename)">删除</button>
+                </li>
+            </ul>
+        </th:block>
+        <div th:if="${files == null or files.isEmpty()}" class="file-empty">暂无文件</div>
+    </div>
+
+    <form id="deleteForm" method="post" style="display:none">
+        <input type="hidden" name="filename" id="deleteFilename">
+        <input type="password" name="password" id="deletePwd">
+    </form>
+
+    <script>
+        const PWD_KEY = 'wxhm_pwd';
+        const EXPIRE_KEY = 'wxhm_expire';
+        window.onload = function() {
+            const pwd = localStorage.getItem(PWD_KEY);
+            const exp = localStorage.getItem(EXPIRE_KEY);
+            if (pwd && exp && new Date().getTime() < exp) {
+                const uploadPwd = document.getElementById('uploadPwd');
+                if (uploadPwd) uploadPwd.value = pwd;
+            }
+        };
+        function savePwd() {
+            const pwdInput = document.getElementById('uploadPwd');
+            if (pwdInput && pwdInput.value) {
+                localStorage.setItem(PWD_KEY, pwdInput.value);
+                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            }
+        }
+        function deleteFile(name) {
+            if (!confirm('确定要删除此文件吗？')) return;
+            const pwdStored = localStorage.getItem(PWD_KEY);
+            const deletePwd = document.getElementById('deletePwd');
+            if (pwdStored && deletePwd) deletePwd.value = pwdStored;
+            else {
+                const inputPwd = prompt('请输入管理密码:');
+                if (!inputPwd || !deletePwd) return;
+                deletePwd.value = inputPwd;
+            }
+            document.getElementById('deleteFilename').value = name;
+            document.getElementById('deleteForm').action = '/admin/upload-file/delete';
+            document.getElementById('deleteForm').submit();
+        }
+    </script>
+</body>
+</html>

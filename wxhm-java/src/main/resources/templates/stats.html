@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流量分析看板</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .chart-row { display: flex; flex-wrap: wrap; gap: 20px; }
+        .trend-box { flex: 2; min-width: 300px; height: 350px; }
+        .pie-box { flex: 1; min-width: 250px; height: 350px; }
+        .header { display: flex; justify-content: space-between; align-items: center; max-width: 1000px; margin: 0 auto 20px; }
+    </style>
+</head>
+<body>
+    <div class="header"><h3>7日数据看板</h3><a href="/admin" style="color:#07c160; text-decoration:none;">返回后台</a></div>
+    <div style="max-width:1000px; margin:0 auto;">
+        <th:block th:each="item, iter : ${statsList}">
+            <div class="card">
+                <h4 style="margin-top:0; border-left:4px solid #07c160; padding-left:10px;" th:text="${item.groupName}">群组</h4>
+                <div class="chart-row">
+                    <div th:id="'trend_' + ${iter.index}" class="trend-box"></div>
+                    <div th:id="'pie_' + ${iter.index}" class="pie-box"></div>
+                </div>
+            </div>
+            <script th:inline="javascript">
+                (function() {
+                    const idx = /*[[${iter.index}]]*/ 0;
+                    const trendData = /*[(${item.trendJson})]*/ [];
+                    const pieData = /*[(${item.pieJson})]*/ [];
+                    const trendChart = echarts.init(document.getElementById('trend_' + idx));
+                    trendChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        legend: { data: ['PV', 'UV'], bottom: 0 },
+                        xAxis: { type: 'category', data: trendData.map(i => i.date ? i.date.slice(5) : '') },
+                        yAxis: { type: 'value' },
+                        series: [
+                            { name: 'PV', type: 'line', smooth: true, areaStyle: {opacity: 0.1}, data: trendData.map(i => i.pv), itemStyle: {color: '#1890ff'} },
+                            { name: 'UV', type: 'line', smooth: true, data: trendData.map(i => i.uv), itemStyle: {color: '#07c160'} }
+                        ]
+                    });
+                    const pieChart = echarts.init(document.getElementById('pie_' + idx));
+                    pieChart.setOption({
+                        title: { text: '今日设备分布', left: 'center', textStyle: {fontSize: 13, color: '#999'} },
+                        tooltip: { trigger: 'item' },
+                        series: [{ type: 'pie', radius: ['40%', '70%'], data: pieData.length ? pieData : [{name: '无数据', value: 0}], itemStyle: {borderRadius: 5} }]
+                    });
+                })();
+            </script>
+        </th:block>
+    </div>
+</body>
+</html>

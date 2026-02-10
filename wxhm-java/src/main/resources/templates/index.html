@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title th:text="${groupName} + ' - 进群通道'">进群通道</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; }
+        .card { background: white; width: 90%; max-width: 350px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        .qr-box { position: relative; width: 250px; height: 250px; margin: 25px auto; background: #fafafa; border: 1px solid #eee; overflow: hidden; }
+        .qr-img { width: 100%; height: 100%; object-fit: contain; }
+        .scanner { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #07c160, transparent); box-shadow: 0 0 8px #07c160; animation: scan 3s infinite linear; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        .ok { color: #07c160; font-weight: bold; margin: 15px 0; }
+        .hint { color: #888; font-size: 13px; }
+        .wechat-tip { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: linear-gradient(135deg, #07c160 0%, #06ae56 100%); color: white; padding: 12px 16px; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; }
+        .wechat-tip.show { display: block; }
+        .wechat-tip strong { display: block; margin-bottom: 4px; }
+        .wechat-tip span { font-size: 12px; opacity: 0.95; }
+        .btn-save { display: inline-block; margin-top: 12px; padding: 10px 24px; background: linear-gradient(135deg, #07c160 0%, #06ae56 100%); color: white; border: none; border-radius: 24px; font-size: 15px; text-decoration: none; box-shadow: 0 4px 12px rgba(7,193,96,0.3); transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(7,193,96,0.4); }
+        .btn-save:active { transform: translateY(0); }
+    </style>
+</head>
+<body>
+    <div id="wechatTip" class="wechat-tip">
+        <strong>建议使用浏览器打开</strong>
+        <span>检测到您在微信内打开，为获得更好体验，请点击右上角「···」选择「在浏览器中打开」或「在 Safari/Chrome 中打开」</span>
+    </div>
+
+    <div class="card">
+        <h3 th:text="${groupName}">群组</h3>
+        <th:block th:if="${qrFile != null and !qrFile.isEmpty()}">
+            <div class="qr-box">
+                <div class="scanner"></div>
+                <img id="qrImg" th:src="${wsrvUrl}" class="qr-img" th:attr="data-fallback=@{/uploads/{g}/{f}(g=${groupName}, f=${qrFile})}" onerror="var f=this.getAttribute('data-fallback');if(f)this.src=f;" alt="群二维码">
+            </div>
+            <p class="ok">● 入口已激活</p>
+            <p class="hint">长按上方二维码识别并加入群聊</p>
+            <a class="btn-save" th:href="@{/uploads/{g}/{f}(g=${groupName},f=${qrFile})}" th:download="${groupName + '_群二维码.webp'}">保存到本地</a>
+        </th:block>
+        <th:block th:unless="${qrFile != null and !qrFile.isEmpty()}">
+            <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效二维码</p>
+        </th:block>
+    </div>
+
+    <script th:inline="javascript">
+        (function() {
+            var ua = navigator.userAgent.toLowerCase();
+            if (ua.indexOf('micromessenger') !== -1) {
+                document.getElementById('wechatTip').classList.add('show');
+                document.body.style.paddingTop = '90px';
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>微信公众号维护</title>
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { width: 100%; max-width: 600px; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        textarea { min-height: 100px; resize: vertical; font-family: monospace; }
+        button { background: #07c160; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .btn-secondary { background: #1890ff; }
+        .btn-danger { background: #ff4d4f; }
+        .btn-small { padding: 6px 12px; width: auto; font-size: 12px; margin: 0 5px; }
+        .msg { color: #ff4d4f; font-size: 13px; text-align: center; }
+        .msg-success { color: #07c160; font-size: 13px; text-align: center; }
+        label { display: block; margin-top: 12px; margin-bottom: 4px; font-size: 13px; color: #666; font-weight: 500; }
+        .form-group { margin-bottom: 15px; }
+        .config-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .form-actions { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <div style="text-align: right; margin-bottom: 15px; width: 100%; max-width: 600px;">
+        <a href="/admin">← 返回管理后台</a>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">快速加载配置</h3>
+        <form method="post" id="loadForm" onsubmit="savePwd()">
+            <input type="hidden" name="action" value="load">
+            <div class="form-group">
+                <label>管理密码 <span style="color:red">*</span></label>
+                <input type="password" id="password_load" name="password" placeholder="请输入管理密码" required>
+            </div>
+            <button type="submit" class="btn-secondary">读取最新配置</button>
+        </form>
+    </div>
+
+    <th:block th:if="${configs != null and !configs.isEmpty()}">
+        <div class="card">
+            <h3 style="margin-top:0">已保存的配置</h3>
+            <div th:each="config : ${configs}" class="config-item">
+                <h4 th:text="${config.name}">配置名</h4>
+                <div class="meta">
+                    <span th:text="'AppID: ' + ${config.appid}"></span> | 
+                    <span th:text="'模板ID: ' + ${config.templateId}"></span> | 
+                    <span th:text="'更新时间: ' + (${config.updatedAt != null} ? ${#temporals.format(config.updatedAt, 'yyyy-MM-dd HH:mm')} : '')"></span>
+                </div>
+                <div style="margin-top:10px;">
+                    <button class="btn-secondary btn-small" th:attr="data-id=${config.id}" onclick="editConfig(this.dataset.id)">编辑</button>
+                    <button class="btn-small" th:attr="data-id=${config.id}" onclick="sendMessage(this.dataset.id)">发送</button>
+                    <button class="btn-danger btn-small" th:attr="data-id=${config.id}" onclick="deleteConfig(this.dataset.id)">删除</button>
+                </div>
+            </div>
+        </div>
+    </th:block>
+
+    <div class="card">
+        <h3 style="margin-top:0" th:text="${editConfig != null} ? '编辑配置' : '新增配置'">配置表单</h3>
+        <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
+        <form method="post" id="configForm" onsubmit="return submitConfigForm()">
+            <input type="hidden" name="action" value="save">
+            <input type="hidden" name="password" id="password_hidden">
+            <input th:if="${editConfig != null}" type="hidden" name="config_id" th:value="${editConfig.id}">
+
+            <div class="form-group">
+                <label for="appid">AppID <span style="color:red">*</span></label>
+                <input type="text" id="appid" name="appid" th:value="${editConfig != null ? editConfig.appid : ''}" placeholder="例如: wx5a2929a3a7dae867" required>
+            </div>
+            <div class="form-group">
+                <label for="secret">Secret <span style="color:red">*</span></label>
+                <input type="text" id="secret" name="secret" th:value="${editConfig != null ? editConfig.secret : ''}" placeholder="请输入微信公众号Secret" required>
+            </div>
+            <div class="form-group">
+                <label for="touser">用户ID (touser) <span style="color:red">*</span></label>
+                <input type="text" id="touser" name="touser" th:value="${editConfig != null ? editConfig.touser : ''}" placeholder="例如: own8-3MtxTZc9oX4zQurMp_ijbg8" required>
+            </div>
+            <div class="form-group">
+                <label for="template_id">模板ID <span style="color:red">*</span></label>
+                <input type="text" id="template_id" name="template_id" th:value="${editConfig != null ? editConfig.templateId : ''}" placeholder="模板ID" required>
+            </div>
+            <div class="form-group">
+                <label for="template_data">模板数据 (JSON格式) <span style="color:red">*</span></label>
+                <textarea id="template_data" name="template_data" required th:text="${editConfig != null ? editConfig.templateData : ''}"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="url">跳转链接 (可选)</label>
+                <input type="url" id="url" name="url" th:value="${editConfig != null and editConfig.url != null ? editConfig.url : ''}" placeholder="https://example.com">
+            </div>
+            <div class="form-actions">
+                <button type="submit" th:text="${editConfig != null} ? '更新配置' : '保存配置'">保存</button>
+                <button th:if="${editConfig != null}" type="button" class="btn-secondary" onclick="cancelEdit()">取消</button>
+            </div>
+        </form>
+    </div>
+
+    <form id="deleteForm" method="post" style="display:none">
+        <input type="password" name="password" id="deletePwd">
+    </form>
+    <form id="sendForm" method="post" style="display:none">
+        <input type="hidden" name="action" value="send">
+        <input type="hidden" name="config_id" id="sendConfigId">
+        <input type="password" name="password" id="sendPwd">
+    </form>
+
+    <script>
+        const PWD_KEY = 'wxhm_pwd';
+        const EXPIRE_KEY = 'wxhm_expire';
+        window.onload = function() {
+            const pwd = localStorage.getItem(PWD_KEY);
+            const exp = localStorage.getItem(EXPIRE_KEY);
+            if (pwd && exp && new Date().getTime() < exp) {
+                const loadPwd = document.getElementById('password_load');
+                if (loadPwd) loadPwd.value = pwd;
+            }
+            const templateData = document.getElementById('template_data');
+            if (templateData && !templateData.value.trim()) {
+                templateData.value = JSON.stringify({
+                    "group": {"value": ""},
+                    "action": {"value": ""},
+                    "server": {"value": ""},
+                    "user": {"value": ""},
+                    "time": {"value": ""}
+                }, null, 2);
+            }
+        };
+        function submitConfigForm() {
+            var pwdEl = document.getElementById('password_load');
+            if (!pwdEl || !pwdEl.value) {
+                alert('请先在「快速加载配置」处输入管理密码');
+                return false;
+            }
+            document.getElementById('password_hidden').value = pwdEl.value;
+            localStorage.setItem(PWD_KEY, pwdEl.value);
+            localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            return true;
+        }
+        function savePwd() {
+            var pwdEl = document.getElementById('password_load');
+            if (pwdEl && pwdEl.value) {
+                localStorage.setItem(PWD_KEY, pwdEl.value);
+                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            }
+        }
+        function editConfig(id) {
+            window.location.href = '/admin/notice?edit=' + id;
+        }
+        function cancelEdit() {
+            window.location.href = '/admin/notice';
+        }
+        function deleteConfig(id) {
+            if (confirm('确定要删除此配置吗？')) {
+                const pwd = localStorage.getItem(PWD_KEY);
+                if (pwd) document.getElementById('deletePwd').value = pwd;
+                else {
+                    const inputPwd = prompt('请输入管理密码:');
+                    if (!inputPwd) return;
+                    document.getElementById('deletePwd').value = inputPwd;
+                }
+                document.getElementById('deleteForm').action = '/admin/notice/delete/' + id;
+                document.getElementById('deleteForm').submit();
+            }
+        }
+        function sendMessage(id) {
+            if (confirm('确定要发送模板消息吗？')) {
+                const pwd = localStorage.getItem(PWD_KEY);
+                if (pwd) document.getElementById('sendPwd').value = pwd;
+                else {
+                    const inputPwd = prompt('请输入管理密码:');
+                    if (!inputPwd) return;
+                    document.getElementById('sendPwd').value = inputPwd;
+                }
+                document.getElementById('sendConfigId').value = id;
+                document.getElementById('sendForm').submit();
+            }
+        }
+    </script>
+</body>
+</html>

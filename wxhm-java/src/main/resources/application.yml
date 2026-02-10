@@ -1,0 +1,26 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: wxhm
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  datasource:
+    url: jdbc:sqlite:stats.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+# wxHm 配置
+wxhm:
+  upload-base: uploads
+  files-dir: uploads/files
+  admin-password: ${ADMIN_PASSWORD:admin321}
+  expire-days: 7
+  github-url: https://github.com/cooker/wxHm
