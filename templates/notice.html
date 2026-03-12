@@ -193,7 +193,7 @@
             }
             document.getElementById('password_hidden').value = pwdEl.value;
             localStorage.setItem(PWD_KEY, pwdEl.value);
-            localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 7*24*60*60*1000);
             localStorage.setItem(APPID_KEY, document.getElementById('appid').value);
             localStorage.setItem(SECRET_KEY, document.getElementById('secret').value);
             return true;
@@ -203,7 +203,7 @@
             var pwdEl = document.getElementById('password_load');
             if (pwdEl && pwdEl.value) {
                 localStorage.setItem(PWD_KEY, pwdEl.value);
-                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 7*24*60*60*1000);
             }
         }
         

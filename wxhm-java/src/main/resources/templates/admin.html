@@ -14,6 +14,7 @@
         .msg-success { color: #07c160; font-size: 13px; text-align: center; }
         .group-item { background: white; margin-top: 10px; padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; font-size: 14px; }
         .btn-op { background: none; color: #1890ff; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; }
+        .btn-replace { background: none; color: #07c160; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; font-size: 13px; }
         .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         .btn-delete:hover { background: #ff7875; }
     </style>
@@ -41,8 +42,9 @@
                 <span><strong th:text="${g}">群组</strong></span>
                 <div>
                     <a th:href="@{/group/{name}(name=${g})}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
-                    <button class="btn-op" th:attr="data-name=${g}" onclick="handleRename(this.dataset.name)">更名</button>
-                    <button class="btn-delete" th:attr="data-name=${g}" onclick="handleDelete(this.dataset.name)">删除</button>
+                    <button type="button" class="btn-replace" th:attr="data-name=${g}" onclick="handleReplaceQr(this.dataset.name)">修改群码</button>
+                    <button type="button" class="btn-op" th:attr="data-name=${g}" onclick="handleRename(this.dataset.name)">更名</button>
+                    <button type="button" class="btn-delete" th:attr="data-name=${g}" onclick="handleDelete(this.dataset.name)">删除</button>
                 </div>
             </div>
         </th:block>
@@ -52,6 +54,12 @@
         <input type="password" name="password" id="opPwd">
         <input type="hidden" name="old_name" id="oldName">
         <input type="hidden" name="new_name" id="newName">
+    </form>
+
+    <form id="replaceQrForm" method="post" action="/admin" enctype="multipart/form-data" style="display:none">
+        <input type="hidden" name="password" id="replacePwd">
+        <input type="hidden" name="group_name" id="replaceGroupName">
+        <input type="file" name="file" id="replaceFile" accept="image/*">
     </form>
 
     <script>
@@ -66,9 +74,25 @@
             }
         };
         function savePwd() {
-            localStorage.setItem(PWD_KEY, document.getElementById('mainPwd').value);
-            localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
+            var el = document.getElementById('mainPwd');
+            if (el && el.value) {
+                localStorage.setItem(PWD_KEY, el.value);
+                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 7*24*60*60*1000);
+            }
         }
+        function handleReplaceQr(name) {
+            document.getElementById('replaceGroupName').value = name;
+            document.getElementById('replacePwd').value = document.getElementById('mainPwd').value;
+            document.getElementById('replaceFile').value = '';
+            document.getElementById('replaceFile').click();
+        }
+        document.getElementById('replaceFile').onchange = function() {
+            if (this.files && this.files.length) {
+                document.getElementById('replacePwd').value = document.getElementById('mainPwd').value;
+                savePwd();
+                document.getElementById('replaceQrForm').submit();
+            }
+        };
         function handleRename(name) {
             const n = prompt("新名字:");
             if(n) {
@@ -76,6 +100,7 @@
                 document.getElementById('oldName').value = name;
                 document.getElementById('newName').value = n;
                 document.getElementById('opForm').action = "/admin/rename";
+                savePwd();
                 document.getElementById('opForm').submit();
             }
         }
@@ -83,6 +108,7 @@
             if(confirm("确定删除吗？")) {
                 document.getElementById('opPwd').value = document.getElementById('mainPwd').value;
                 document.getElementById('opForm').action = "/admin/delete/" + name;
+                savePwd();
                 document.getElementById('opForm').submit();
             }
         }

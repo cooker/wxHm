@@ -14,8 +14,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 /**
@@ -52,7 +50,8 @@ public class GroupController {
             String scheme = request.getHeader("X-Forwarded-Proto");
             if (scheme == null || scheme.isBlank()) scheme = "https";
             String rawUrl = scheme + "://" + host + "/uploads/" + groupName + "/" + qrFile;
-            wsrvUrl = "https://wsrv.nl/?url=" + URLEncoder.encode(rawUrl, StandardCharsets.UTF_8) + "&we=1&v=" + System.currentTimeMillis() / 1000;
+//            wsrvUrl = "https://wsrv.nl/?url=" + URLEncoder.encode(rawUrl, StandardCharsets.UTF_8) + "&we=1&v=" + System.currentTimeMillis() / 1000;
+            wsrvUrl = rawUrl + "?we=1&v=" + System.currentTimeMillis() / 1000;
         }
 
         model.addAttribute("groupName", groupName);
