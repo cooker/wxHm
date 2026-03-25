@@ -17,6 +17,10 @@
         .btn-del { color: #ff4d4f; }
         .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         .btn-delete:hover { background: #ff7875; }
+        .group-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+        .qr-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+        .qr-badge.ok { background: #e8f9f0; color: #07c160; border: 1px solid #b7eb8f; }
+        .qr-badge.expired { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
         .divider { width: 100%; max-width: 400px; height: 1px; background: #eee; margin: 20px 0; }
         .upload-section { margin-top: 20px; }
         .upload-section label { display: block; margin-top: 10px; font-size: 13px; color: #666; }
@@ -48,14 +52,18 @@
     </div>
 
     <div style="width:100%; max-width:400px; margin-top:20px;">
-        {% for g in groups %}
+        {% for row in group_rows %}
         <div class="group-item">
-            <span><strong>{{ g }}</strong></span>
+            <span class="group-title">
+                <strong>{{ row.name }}</strong>
+                {% if row.qr_active %}<span class="qr-badge ok" title="当前有可展示的群码">有效</span>
+                {% else %}<span class="qr-badge expired" title="无未过期群码，请上传或更换">已失效</span>{% endif %}
+            </span>
             <div>
-                <a href="/group/{{ g }}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
-                <button type="button" class="btn-replace" onclick="handleReplaceQr('{{ g }}')">修改群码</button>
-                <button type="button" class="btn-op" onclick="handleRename('{{ g }}')">更名</button>
-                <button type="button" class="btn-delete" onclick="handleDelete('{{ g }}')">删除</button>
+                <a href="/group/{{ row.name }}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
+                <button type="button" class="btn-replace" onclick="handleReplaceQr('{{ row.name }}')">修改群码</button>
+                <button type="button" class="btn-op" onclick="handleRename('{{ row.name }}')">更名</button>
+                <button type="button" class="btn-delete" onclick="handleDelete('{{ row.name }}')">删除</button>
             </div>
         </div>
         {% endfor %}

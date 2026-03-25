@@ -68,7 +68,14 @@ public class AdminController {
     // ==================== 管理中心 ====================
     @GetMapping("/admin")
     public String admin(Model model) {
-        model.addAttribute("groups", qrService.listGroups());
+        var groupRows = new java.util.ArrayList<java.util.Map<String, Object>>();
+        for (String g : qrService.listGroups()) {
+            var row = new java.util.HashMap<String, Object>();
+            row.put("name", g);
+            row.put("qrActive", qrService.hasActiveQr(g));
+            groupRows.add(row);
+        }
+        model.addAttribute("groupRows", groupRows);
         return "admin";
     }
 

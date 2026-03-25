@@ -23,6 +23,14 @@
         .btn-save { display: inline-block; margin-top: 12px; padding: 10px 24px; background: linear-gradient(135deg, #07c160 0%, #06ae56 100%); color: white; border: none; border-radius: 24px; font-size: 15px; text-decoration: none; box-shadow: 0 4px 12px rgba(7,193,96,0.3); transition: transform 0.2s, box-shadow 0.2s; }
         .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(7,193,96,0.4); }
         .btn-save:active { transform: translateY(0); }
+        .visit-notice { width: 100%; max-width: 310px; margin: 0 auto 16px; padding: 0; border-radius: 12px; background: #f6fff9; border: 1px solid #e0eee4; box-shadow: 0 1px 4px rgba(7, 193, 96, 0.08); overflow: hidden; }
+        .visit-notice-track { overflow: hidden; height: 36px; line-height: 36px; }
+        .visit-notice-inner { display: inline-block; white-space: nowrap; font-size: 13px; color: #666; animation: visitNoticeScroll 18s linear infinite; }
+        .visit-notice-inner strong { color: #07c160; font-weight: 700; }
+        @keyframes visitNoticeScroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
     </style>
 </head>
 <body>
@@ -34,6 +42,11 @@
 
     <div class="card">
         <h3>{{ group_name }}</h3>
+        <div class="visit-notice" role="status" aria-live="polite">
+            <div class="visit-notice-track">
+                <div class="visit-notice-inner">本群入口今日访问 <strong>{{ today_visit_count }}</strong> 次</div>
+            </div>
+        </div>
         {% if qr_file %}
             <div class="qr-box">
                 <div class="scanner"></div>

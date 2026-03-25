@@ -17,6 +17,10 @@
         .btn-replace { background: none; color: #07c160; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; font-size: 13px; }
         .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
         .btn-delete:hover { background: #ff7875; }
+        .group-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+        .qr-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+        .qr-badge.ok { background: #e8f9f0; color: #07c160; border: 1px solid #b7eb8f; }
+        .qr-badge.expired { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
     </style>
 </head>
 <body>
@@ -37,14 +41,18 @@
     </div>
 
     <div style="width:100%; max-width:400px; margin-top:20px;">
-        <th:block th:each="g : ${groups}">
+        <th:block th:each="row : ${groupRows}">
             <div class="group-item">
-                <span><strong th:text="${g}">群组</strong></span>
+                <span class="group-title">
+                    <strong th:text="${row.name}">群组</strong>
+                    <span th:if="${row.qrActive}" class="qr-badge ok" title="当前有可展示的群码">有效</span>
+                    <span th:unless="${row.qrActive}" class="qr-badge expired" title="无未过期群码，请上传或更换">已失效</span>
+                </span>
                 <div>
-                    <a th:href="@{/group/{name}(name=${g})}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
-                    <button type="button" class="btn-replace" th:attr="data-name=${g}" onclick="handleReplaceQr(this.dataset.name)">修改群码</button>
-                    <button type="button" class="btn-op" th:attr="data-name=${g}" onclick="handleRename(this.dataset.name)">更名</button>
-                    <button type="button" class="btn-delete" th:attr="data-name=${g}" onclick="handleDelete(this.dataset.name)">删除</button>
+                    <a th:href="@{/group/{name}(name=${row.name})}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
+                    <button type="button" class="btn-replace" th:attr="data-name=${row.name}" onclick="handleReplaceQr(this.dataset.name)">修改群码</button>
+                    <button type="button" class="btn-op" th:attr="data-name=${row.name}" onclick="handleRename(this.dataset.name)">更名</button>
+                    <button type="button" class="btn-delete" th:attr="data-name=${row.name}" onclick="handleDelete(this.dataset.name)">删除</button>
                 </div>
             </div>
         </th:block>

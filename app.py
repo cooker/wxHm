@@ -142,20 +142,15 @@ def group_page(group_name):
     ))
     db.session.commit()
 
-    # 自动发送访问通知
-    send_wechat_template_for_event(
-        group_name=group_name,
-        action='用户访问群码',
-        server_ip=client_ip,
-        user_label='访客'
-    )
+    today = datetime.now().strftime('%Y-%m-%d')
+    today_visit_count = VisitLog.query.filter_by(group_name=group_name, date=today).count()
 
     wsrv_url = ""
     if qr_file:
         raw_url = f"https://{request.host}/uploads/{group_name}/{qr_file}"
         wsrv_url = f"https://wsrv.nl/?url={urllib.parse.quote(raw_url, safe='')}&we=1&v={int(time.time())}"
     
-    return render_template('index.html', group_name=group_name, qr_file=qr_file, wsrv_url=wsrv_url)
+    return render_template('index.html', group_name=group_name, qr_file=qr_file, wsrv_url=wsrv_url, today_visit_count=today_visit_count)
 
 # --- 路由：统计看板 ---
 @app.route('/admin/stats')
@@ -231,7 +226,8 @@ def admin():
         else:
             flash("密码错误")
         return redirect(url_for('admin'))
-    return render_template('admin.html', groups=groups)
+    group_rows = [{'name': g, 'qr_active': get_active_qr(g) is not None} for g in groups]
+    return render_template('admin.html', group_rows=group_rows)
 
 @app.route('/admin/upload-file', methods=['GET'])
 def upload_page():

@@ -94,6 +94,11 @@ public class QrService {
         return null;
     }
 
+    /** 当前是否存在未过期的群码图片（与 {@link #getActiveQr} 判定一致，会顺带清理过期文件） */
+    public boolean hasActiveQr(String groupName) {
+        return getActiveQr(groupName) != null;
+    }
+
     /**
      * 保存上传的群码图片，优先转为 WebP；Mac ARM64 等环境下 native 库不可用时自动回退为 PNG。
      */
@@ -198,6 +203,12 @@ public class QrService {
         log.setIp(ip);
         log.setPlatform(platform);
         visitLogRepository.save(log);
+    }
+
+    /** 当前群今日访问次数（PV，含本次请求已写入的一条） */
+    public long countTodayVisits(String groupName) {
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        return visitLogRepository.countByGroupNameAndDate(groupName, today);
     }
 
     public Path getGroupQrPath(String groupName, String filename) {

@@ -1,8 +1,6 @@
 package com.wxhm.controller;
 
-import com.wxhm.config.WxHmProperties;
 import com.wxhm.service.QrService;
-import com.wxhm.service.WeChatNotifyService;
 import com.wxhm.util.PlatformUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
@@ -23,13 +21,9 @@ import java.nio.file.Path;
 public class GroupController {
 
     private final QrService qrService;
-    private final WeChatNotifyService weChatNotifyService;
-    private final WxHmProperties properties;
 
-    public GroupController(QrService qrService, WeChatNotifyService weChatNotifyService, WxHmProperties properties) {
+    public GroupController(QrService qrService) {
         this.qrService = qrService;
-        this.weChatNotifyService = weChatNotifyService;
-        this.properties = properties;
     }
 
     @GetMapping("/group/{groupName}")
@@ -41,7 +35,7 @@ public class GroupController {
         String clientIp = qrService.getClientIp(request);
 
         qrService.logVisit(groupName, clientIp, platform);
-        weChatNotifyService.sendAsync(groupName, "用户访问群码", clientIp, "访客");
+        long todayVisitCount = qrService.countTodayVisits(groupName);
 
         String wsrvUrl = "";
         if (qrFile != null) {
@@ -57,6 +51,7 @@ public class GroupController {
         model.addAttribute("groupName", groupName);
         model.addAttribute("qrFile", qrFile);
         model.addAttribute("wsrvUrl", wsrvUrl);
+        model.addAttribute("todayVisitCount", todayVisitCount);
         return "index";
     }
 
