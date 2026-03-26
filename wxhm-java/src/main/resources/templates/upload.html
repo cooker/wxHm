@@ -21,17 +21,26 @@
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
         .file-item a { color: #1890ff; text-decoration: none; word-break: break-all; }
         .file-empty { font-size: 13px; color: #999; text-align: center; margin-top: 10px; }
+        .toast-wrap { position: fixed; right: 20px; top: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { min-width: 220px; max-width: 360px; color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); font-size: 13px; opacity: 0; transform: translateY(-6px); transition: all .22s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #07c160; }
+        .toast.error { background: #ff4d4f; }
     </style>
 </head>
 <body>
+    <div id="toastWrap" class="toast-wrap"></div>
     <div class="back-link">
         <a href="/admin">← 返回管理后台</a>
+        <span style="margin:0 10px; color:#ddd;">|</span>
+        <a href="/admin/logout" style="color:#999;">退出登录</a>
     </div>
     <div class="card">
         <h3 style="margin-top:0">📁 上传自定义文件</h3>
-        <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
-        <form method="post" enctype="multipart/form-data" action="/upload" onsubmit="return ensureUploadPwdAndSave();">
-            <input type="password" name="password" id="uploadPwd" placeholder="管理密码" required autocomplete="off">
+        <div id="uploadMsg">
+            <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
+        </div>
+        <form id="uploadForm" method="post" enctype="multipart/form-data" action="/upload">
             <input type="file" name="file" required>
             <button type="submit">上传文件</button>
         </form>
@@ -39,15 +48,14 @@
 
     <div class="card">
         <h3 style="margin-top:0">📋 粘贴样式创建文件</h3>
-        <p style="font-size:12px; color:#666; margin:0 0 10px 0;">粘贴包含 <code>##文本内容</code> … <code>##</code> 的文本，每行格式：<strong>文件名 内容</strong>（第一个空格前为文件名，后面为文件内容）。使用上方同一管理密码。</p>
-        <form method="post" action="/admin/upload-file/paste" onsubmit="return ensurePastePwdAndSubmit();">
-            <input type="hidden" name="password" id="pastePwd">
+        <p style="font-size:12px; color:#666; margin:0 0 10px 0;">粘贴包含 <code>##文本内容</code> … <code>##</code> 的文本，每行格式：<strong>文件名 内容</strong>（第一个空格前为文件名，后面为文件内容）。</p>
+        <form id="pasteForm" method="post" action="/admin/upload-file/paste">
             <textarea name="paste_content" rows="8" placeholder="##文本内容&#10;c6797e1cf950c96f53aa5acc6f7dd07a.txt 79bd3278b8feb70b7331bf369d4e57e171bedc65&#10;##" style="width:100%; padding:12px; margin:8px 0; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:monospace; font-size:13px;"></textarea>
             <button type="submit">解析并创建文件</button>
         </form>
     </div>
 
-    <div class="card">
+    <div id="filesCard" class="card">
         <h3 style="margin-top:0">📄 已上传文件</h3>
         <th:block th:if="${files != null and !files.isEmpty()}">
             <ul class="file-list">
@@ -62,68 +70,65 @@
 
     <form id="deleteForm" method="post" style="display:none">
         <input type="hidden" name="filename" id="deleteFilename">
-        <input type="password" name="password" id="deletePwd">
     </form>
 
     <script>
-        const PWD_KEY = 'wxhm_pwd';
-        const EXPIRE_KEY = 'wxhm_expire';
-        window.onload = function() {
-            const pwd = localStorage.getItem(PWD_KEY);
-            const exp = localStorage.getItem(EXPIRE_KEY);
-            if (pwd && exp && new Date().getTime() < exp) {
-                const uploadPwd = document.getElementById('uploadPwd');
-                const pastePwd = document.getElementById('pastePwd');
-                if (uploadPwd) uploadPwd.value = pwd;
-                if (pastePwd) pastePwd.value = pwd;
-            }
-        };
-        function savePwd() {
-            const pwdInput = document.getElementById('uploadPwd');
-            if (pwdInput && pwdInput.value) {
-                localStorage.setItem(PWD_KEY, pwdInput.value);
-                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 7*24*60*60*1000);
+        function showToast(text, type) {
+            if (!text) return;
+            const wrap = document.getElementById('toastWrap');
+            if (!wrap) return;
+            const el = document.createElement('div');
+            el.className = 'toast ' + (type || 'success');
+            el.textContent = text;
+            wrap.appendChild(el);
+            requestAnimationFrame(function() { el.classList.add('show'); });
+            setTimeout(function() {
+                el.classList.remove('show');
+                setTimeout(function() { el.remove(); }, 240);
+            }, 2200);
+        }
+        function replaceFromResponse(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const msg = doc.getElementById('uploadMsg');
+            const files = doc.getElementById('filesCard');
+            if (msg) document.getElementById('uploadMsg').innerHTML = msg.innerHTML;
+            if (files) document.getElementById('filesCard').innerHTML = files.innerHTML;
+            const p = document.querySelector('#uploadMsg p');
+            if (p) {
+                showToast(p.textContent.trim(), p.classList.contains('msg-success') ? 'success' : 'error');
+                p.remove();
             }
         }
-        function ensureUploadPwdAndSave() {
-            var pwdEl = document.getElementById('uploadPwd');
-            if (!pwdEl) return true;
-            if (!pwdEl.value) {
-                var cached = localStorage.getItem(PWD_KEY);
-                if (cached) pwdEl.value = cached;
-            }
-            savePwd();
-            return true;
+        function ajaxSubmitForm(form) {
+            const fd = new FormData(form);
+            return fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(resp) {
+                    if (resp.redirected && resp.url.indexOf('/admin/login') !== -1) {
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    return fetch('/admin/upload-file', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                        .then(function(r) { return r.text(); })
+                        .then(function(html) {
+                            replaceFromResponse(html);
+                            if (form.id === 'uploadForm') form.reset();
+                            if (form.id === 'pasteForm') form.reset();
+                        });
+                })
+                .catch(function() {});
         }
-        function ensurePastePwdAndSubmit() {
-            var pwdEl = document.getElementById('uploadPwd');
-            var pasteEl = document.getElementById('pastePwd');
-            if (!pwdEl || !pasteEl) return false;
-            if (!pwdEl.value) {
-                var cached = localStorage.getItem(PWD_KEY);
-                if (cached) pwdEl.value = cached;
-            }
-            if (!pwdEl.value) {
-                alert('请先在上方输入管理密码');
-                return false;
-            }
-            savePwd();
-            pasteEl.value = pwdEl.value;
-            return true;
-        }
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            ajaxSubmitForm(this);
+        });
+        document.getElementById('pasteForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            ajaxSubmitForm(this);
+        });
         function deleteFile(name) {
-            if (!confirm('确定要删除此文件吗？')) return;
-            const pwdStored = localStorage.getItem(PWD_KEY);
-            const deletePwd = document.getElementById('deletePwd');
-            if (pwdStored && deletePwd) deletePwd.value = pwdStored;
-            else {
-                const inputPwd = prompt('请输入管理密码:');
-                if (!inputPwd || !deletePwd) return;
-                deletePwd.value = inputPwd;
-            }
             document.getElementById('deleteFilename').value = name;
             document.getElementById('deleteForm').action = '/admin/upload-file/delete';
-            document.getElementById('deleteForm').submit();
+            ajaxSubmitForm(document.getElementById('deleteForm'));
         }
     </script>
 </body>

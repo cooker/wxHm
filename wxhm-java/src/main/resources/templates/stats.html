@@ -19,6 +19,10 @@
     </style>
 </head>
 <body>
+    <div style="text-align:right; max-width:1000px; margin:0 auto 8px; padding:0 4px; font-size:14px;">
+        <a href="/admin" style="color:#1890ff; text-decoration:none; margin-right:12px;">返回管理后台</a>
+        <a href="/admin/logout" style="color:#999; text-decoration:none;">退出登录</a>
+    </div>
     <div class="header">
         <h3 style="margin:0;">7日数据看板</h3>
         <div class="refresh-bar">
@@ -45,6 +49,7 @@
 
     <script th:inline="javascript">
     (function() {
+        var adminToken = /*[[${adminToken}]]*/ '';
         var chartData = /*[(${chartDataJson})]*/ [];
         var trendCharts = [];
         var pieCharts = [];
@@ -123,7 +128,9 @@
         }
 
         function fetchAndUpdate() {
-            fetch('/admin/stats/data')
+            fetch('/admin/stats/data', {
+                headers: { 'X-Admin-Token': adminToken }
+            })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     applyChartData(data);

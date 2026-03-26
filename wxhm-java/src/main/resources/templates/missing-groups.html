@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>未创建群码访问统计</title>
+    <style>
+        body { font-family: sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+        .wrap { max-width: 1100px; margin: 0 auto; }
+        .top-nav { text-align: right; margin-bottom: 14px; font-size: 14px; }
+        .top-nav a { color: #1890ff; text-decoration: none; margin-left: 12px; }
+        .card { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,.05); margin-bottom: 16px; }
+        h3 { margin: 0 0 12px 0; }
+        .hint { color: #666; font-size: 13px; margin: 0 0 8px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 6px; text-align: left; }
+        th { color: #666; font-weight: 600; background: #fafafa; }
+        .empty { color: #999; font-size: 13px; padding: 8px 0; }
+        .op-btn { display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 6px; font-size: 12px; text-decoration: none; border: 1px solid #b7eb8f; color: #07c160; background: #f6fff9; }
+        .op-btn:hover { background: #ecfff4; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="top-nav">
+        <a href="/admin">返回管理后台</a>
+        <a href="/admin/logout" style="color:#999;">退出登录</a>
+    </div>
+
+    <div class="card">
+        <h3>未创建群码访问汇总（最近 3 天）</h3>
+        <p class="hint">仅统计访问了不存在群码链接的请求；数据自动保留 3 天。</p>
+        <th:block th:if="${summaryRows != null and !summaryRows.isEmpty()}">
+            <table>
+                <thead>
+                <tr>
+                    <th>群名</th>
+                    <th>访问次数(PV)</th>
+                    <th>去重访客(UV)</th>
+                    <th>最近访问时间</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${summaryRows}">
+                    <td th:text="${r.groupName}">demo-group</td>
+                    <td th:text="${r.pv}">0</td>
+                    <td th:text="${r.uv}">0</td>
+                    <td th:text="${r.lastVisit}">2026-01-01 00:00:00</td>
+                    <td>
+                        <a class="op-btn" th:href="@{/admin(group_name=${r.groupName})}">快速创建群码</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+        <div th:if="${summaryRows == null or summaryRows.isEmpty()}" class="empty">最近 3 天暂无未创建群码访问记录</div>
+    </div>
+
+    <div class="card">
+        <h3>最近访问明细（最多 200 条）</h3>
+        <th:block th:if="${recentRows != null and !recentRows.isEmpty()}">
+            <table>
+                <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>群名</th>
+                    <th>IP</th>
+                    <th>平台</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${recentRows}">
+                    <td th:text="${r.createdAt}">2026-01-01 00:00:00</td>
+                    <td th:text="${r.groupName}">group</td>
+                    <td th:text="${r.ip}">127.0.0.1</td>
+                    <td th:text="${r.platform}">Other</td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+        <div th:if="${recentRows == null or recentRows.isEmpty()}" class="empty">暂无明细</div>
+    </div>
+</div>
+</body>
+</html>
+

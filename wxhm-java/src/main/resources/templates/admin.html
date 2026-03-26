@@ -14,110 +14,207 @@
         .msg-success { color: #07c160; font-size: 13px; text-align: center; }
         .group-item { background: white; margin-top: 10px; padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; font-size: 14px; }
         .btn-op { background: none; color: #1890ff; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; }
-        .btn-replace { background: none; color: #07c160; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; font-size: 13px; }
-        .btn-delete { background: #ff4d4f; color: white; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
-        .btn-delete:hover { background: #ff7875; }
+        .op-actions { display: flex; align-items: center; gap: 6px; }
+        .op-btn { display: inline-flex; align-items: center; justify-content: center; padding: 5px 10px; border-radius: 6px; font-size: 12px; line-height: 1; text-decoration: none; cursor: pointer; border: 1px solid transparent; background: #fff; }
+        .op-btn-preview { color: #07c160; border-color: #b7eb8f; background: #f6fff9; }
+        .op-btn-preview:hover { background: #ecfff4; }
+        .op-btn-replace { color: #07c160; border-color: #b7eb8f; background: #f6fff9; }
+        .op-btn-replace:hover { background: #ecfff4; }
+        .op-btn-delete { color: #ff4d4f; border-color: #ffccc7; background: #fff2f0; }
+        .op-btn-delete:hover { background: #ffe7e6; }
         .group-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+        .group-name { cursor: text; padding: 2px 4px; border-radius: 4px; }
+        .group-name:hover { background: #f5f5f5; }
+        .group-name.editing { background: #fff; border: 1px solid #91d5ff; outline: none; }
         .qr-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
         .qr-badge.ok { background: #e8f9f0; color: #07c160; border: 1px solid #b7eb8f; }
         .qr-badge.expired { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
+        .toast-wrap { position: fixed; right: 20px; top: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { min-width: 220px; max-width: 360px; color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); font-size: 13px; opacity: 0; transform: translateY(-6px); transition: all .22s; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #07c160; }
+        .toast.error { background: #ff4d4f; }
+        .menu-card-wrap { width: 100%; max-width: 400px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .menu-card { display: block; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 12px; text-decoration: none; color: #333; box-shadow: 0 2px 10px rgba(0,0,0,0.04); transition: all .2s; }
+        .menu-card:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.08); border-color: #d9f7be; }
+        .menu-card .t { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .menu-card .d { display: block; font-size: 12px; color: #999; line-height: 1.4; }
+        .menu-card.logout { border-color: #ffd8d6; }
+        .menu-card.logout:hover { border-color: #ffb3b0; }
     </style>
 </head>
 <body>
-    <div style="text-align: right; margin-bottom: 15px;">
-        <a href="/admin/stats" style="color: #1890ff; font-size: 14px; text-decoration: none; margin-right: 15px;">📈 查看数据趋势</a>
-        <a href="/admin/upload-file" style="color: #1890ff; font-size: 14px; text-decoration: none; margin-right: 15px;">📁 上传自定义文件</a>
-        <a href="/admin/notice" style="color: #1890ff; font-size: 14px; text-decoration: none;">📢 微信公众号维护</a>
+    <div id="toastWrap" class="toast-wrap"></div>
+    <div class="menu-card-wrap">
+        <a class="menu-card" href="/admin/stats">
+            <span class="t">📈 数据趋势</span>
+            <span class="d">查看 7 日 PV/UV 与设备分布</span>
+        </a>
+        <a class="menu-card" href="/admin/missing-groups">
+            <span class="t">🧭 未创建群码访问</span>
+            <span class="d">统计访问不存在群码链接的用户</span>
+        </a>
+        <a class="menu-card" href="/admin/upload-file">
+            <span class="t">📁 上传自定义文件</span>
+            <span class="d">上传/创建并管理 files 文件</span>
+        </a>
+        <a class="menu-card" href="/admin/notice">
+            <span class="t">📢 公众号维护</span>
+            <span class="d">配置并发送微信模板消息</span>
+        </a>
+        <a class="menu-card logout" href="/admin/logout" style="grid-column: 1 / -1;">
+            <span class="t">退出登录</span>
+            <span class="d">结束当前后台会话</span>
+        </a>
     </div>
     <div class="card">
         <h3 style="margin-top:0">管理中心</h3>
-        <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
-        <form method="post" enctype="multipart/form-data" action="/admin" onsubmit="savePwd()">
-            <input type="password" id="mainPwd" name="password" placeholder="管理密码" required>
-            <input type="text" name="group_name" placeholder="群组名" required>
+        <div id="adminMsg">
+            <p th:if="${message}" th:class="${message != null and message.contains('成功')} ? 'msg-success' : 'msg'" th:text="${message}"></p>
+        </div>
+        <form id="publishForm" method="post" enctype="multipart/form-data" action="/admin">
+            <input type="text" name="group_name" id="publishGroupName" placeholder="群组名" th:value="${prefillGroupName}" required>
             <input type="file" name="file" accept="image/*" required>
             <button type="submit">上传并发布</button>
         </form>
     </div>
 
-    <div style="width:100%; max-width:400px; margin-top:20px;">
+    <div id="groupList" style="width:100%; max-width:400px; margin-top:20px;">
         <th:block th:each="row : ${groupRows}">
             <div class="group-item">
                 <span class="group-title">
-                    <strong th:text="${row.name}">群组</strong>
+                    <strong class="group-name" th:attr="data-name=${row.name}" th:text="${row.name}" onclick="startEditName(this)" title="点击可直接修改群名">群组</strong>
                     <span th:if="${row.qrActive}" class="qr-badge ok" title="当前有可展示的群码">有效</span>
                     <span th:unless="${row.qrActive}" class="qr-badge expired" title="无未过期群码，请上传或更换">已失效</span>
                 </span>
-                <div>
-                    <a th:href="@{/group/{name}(name=${row.name})}" target="_blank" style="text-decoration:none; color:#07c160; font-size:13px; margin-right:10px;">预览</a>
-                    <button type="button" class="btn-replace" th:attr="data-name=${row.name}" onclick="handleReplaceQr(this.dataset.name)">修改群码</button>
-                    <button type="button" class="btn-op" th:attr="data-name=${row.name}" onclick="handleRename(this.dataset.name)">更名</button>
-                    <button type="button" class="btn-delete" th:attr="data-name=${row.name}" onclick="handleDelete(this.dataset.name)">删除</button>
+                <div class="op-actions">
+                    <a class="op-btn op-btn-preview" th:href="@{/group/{name}(name=${row.name})}" target="_blank">预</a>
+                    <button type="button" class="op-btn op-btn-replace" th:attr="data-name=${row.name}" onclick="handleReplaceQr(this.dataset.name)">修</button>
+                    <button type="button" class="op-btn op-btn-delete" th:attr="data-name=${row.name}" onclick="handleDelete(this.dataset.name)">删</button>
                 </div>
             </div>
         </th:block>
     </div>
 
     <form id="opForm" method="post" style="display:none">
-        <input type="password" name="password" id="opPwd">
         <input type="hidden" name="old_name" id="oldName">
         <input type="hidden" name="new_name" id="newName">
     </form>
 
     <form id="replaceQrForm" method="post" action="/admin" enctype="multipart/form-data" style="display:none">
-        <input type="hidden" name="password" id="replacePwd">
         <input type="hidden" name="group_name" id="replaceGroupName">
         <input type="file" name="file" id="replaceFile" accept="image/*">
     </form>
 
     <script>
-        const PWD_KEY = 'wxhm_pwd';
-        const EXPIRE_KEY = 'wxhm_expire';
-        window.onload = function() {
-            const pwd = localStorage.getItem(PWD_KEY);
-            const exp = localStorage.getItem(EXPIRE_KEY);
-            if (pwd && exp && new Date().getTime() < exp) {
-                const mainPwd = document.getElementById('mainPwd');
-                if (mainPwd) mainPwd.value = pwd;
-            }
-        };
-        function savePwd() {
-            var el = document.getElementById('mainPwd');
-            if (el && el.value) {
-                localStorage.setItem(PWD_KEY, el.value);
-                localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 7*24*60*60*1000);
+        function showToast(text, type) {
+            if (!text) return;
+            const wrap = document.getElementById('toastWrap');
+            if (!wrap) return;
+            const el = document.createElement('div');
+            el.className = 'toast ' + (type || 'success');
+            el.textContent = text;
+            wrap.appendChild(el);
+            requestAnimationFrame(function() { el.classList.add('show'); });
+            setTimeout(function() {
+                el.classList.remove('show');
+                setTimeout(function() { el.remove(); }, 240);
+            }, 2200);
+        }
+        function replaceFromResponse(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const msg = doc.getElementById('adminMsg');
+            const list = doc.getElementById('groupList');
+            if (msg) document.getElementById('adminMsg').innerHTML = msg.innerHTML;
+            if (list) document.getElementById('groupList').innerHTML = list.innerHTML;
+            const p = document.querySelector('#adminMsg p');
+            if (p) {
+                showToast(p.textContent.trim(), p.classList.contains('msg-success') ? 'success' : 'error');
+                p.remove();
             }
         }
+        function ajaxSubmitForm(form) {
+            const fd = new FormData(form);
+            return fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(resp) {
+                    if (resp.redirected && resp.url.indexOf('/admin/login') !== -1) {
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    return fetch('/admin', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                        .then(function(r) { return r.text(); })
+                        .then(function(html) {
+                            replaceFromResponse(html);
+                            if (form.id === 'publishForm') form.reset();
+                        });
+                })
+                .catch(function() {});
+        }
+        document.getElementById('publishForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            ajaxSubmitForm(this);
+        });
+        (function focusPrefillGroupName() {
+            var input = document.getElementById('publishGroupName');
+            if (!input) return;
+            if (input.value && input.value.trim()) {
+                input.focus();
+                input.select();
+            }
+        })();
         function handleReplaceQr(name) {
             document.getElementById('replaceGroupName').value = name;
-            document.getElementById('replacePwd').value = document.getElementById('mainPwd').value;
             document.getElementById('replaceFile').value = '';
             document.getElementById('replaceFile').click();
         }
         document.getElementById('replaceFile').onchange = function() {
             if (this.files && this.files.length) {
-                document.getElementById('replacePwd').value = document.getElementById('mainPwd').value;
-                savePwd();
-                document.getElementById('replaceQrForm').submit();
+                ajaxSubmitForm(document.getElementById('replaceQrForm'));
             }
         };
-        function handleRename(name) {
-            const n = prompt("新名字:");
-            if(n) {
-                document.getElementById('opPwd').value = document.getElementById('mainPwd').value;
-                document.getElementById('oldName').value = name;
-                document.getElementById('newName').value = n;
-                document.getElementById('opForm').action = "/admin/rename";
-                savePwd();
-                document.getElementById('opForm').submit();
-            }
+        function submitRename(oldName, newName) {
+            if (!newName || newName === oldName) return;
+            document.getElementById('oldName').value = oldName;
+            document.getElementById('newName').value = newName;
+            document.getElementById('opForm').action = "/admin/rename";
+            ajaxSubmitForm(document.getElementById('opForm'));
+        }
+        function startEditName(el) {
+            if (!el || el.dataset.editing === '1') return;
+            el.dataset.editing = '1';
+            const oldName = el.dataset.name || el.textContent.trim();
+            el.classList.add('editing');
+            el.contentEditable = 'true';
+            el.textContent = oldName;
+            el.focus();
+            document.execCommand && document.execCommand('selectAll', false, null);
+            const finish = function(commit) {
+                const val = (el.textContent || '').trim();
+                el.contentEditable = 'false';
+                el.classList.remove('editing');
+                el.dataset.editing = '0';
+                el.textContent = oldName;
+                if (commit) submitRename(oldName, val);
+                el.removeEventListener('blur', onBlur);
+                el.removeEventListener('keydown', onKeyDown);
+            };
+            const onBlur = function() { finish(true); };
+            const onKeyDown = function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    finish(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    finish(false);
+                }
+            };
+            el.addEventListener('blur', onBlur);
+            el.addEventListener('keydown', onKeyDown);
         }
         function handleDelete(name) {
             if(confirm("确定删除吗？")) {
-                document.getElementById('opPwd').value = document.getElementById('mainPwd').value;
                 document.getElementById('opForm').action = "/admin/delete/" + name;
-                savePwd();
-                document.getElementById('opForm').submit();
+                ajaxSubmitForm(document.getElementById('opForm'));
             }
         }
     </script>

@@ -1,14 +1,17 @@
 package com.wxhm.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wxhm.config.AdminAuthInterceptor;
 import com.wxhm.config.WxHmProperties;
 import com.wxhm.entity.WeChatTemplate;
 import com.wxhm.repository.WeChatTemplateRepository;
 import com.wxhm.service.QrService;
 import com.wxhm.service.StatsService;
 import com.wxhm.service.WeChatNotifyService;
+import com.wxhm.service.MissingGroupVisitService;
 import com.wxhm.wechat.WeChatApi;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +19,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 管理后台：上传群码、更名、删除、统计、公众号配置、自定义文件
@@ -31,24 +37,60 @@ public class AdminController {
     private final QrService qrService;
     private final StatsService statsService;
     private final WeChatNotifyService weChatNotifyService;
+    private final MissingGroupVisitService missingGroupVisitService;
     private final WeChatTemplateRepository templateRepository;
     private final WeChatApi weChatApi;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AdminController(WxHmProperties properties, QrService qrService, StatsService statsService,
-                           WeChatNotifyService weChatNotifyService, WeChatTemplateRepository templateRepository,
+                           WeChatNotifyService weChatNotifyService, MissingGroupVisitService missingGroupVisitService, WeChatTemplateRepository templateRepository,
                            WeChatApi weChatApi) {
         this.properties = properties;
         this.qrService = qrService;
         this.statsService = statsService;
         this.weChatNotifyService = weChatNotifyService;
+        this.missingGroupVisitService = missingGroupVisitService;
         this.templateRepository = templateRepository;
         this.weChatApi = weChatApi;
     }
 
     private boolean checkPassword(String password) {
-        return properties.getAdminPassword().equals(password);
+        return password != null && properties.getAdminPassword().equals(password);
     }
+
+    private boolean isAdminSession(HttpServletRequest request) {
+        HttpSession s = request.getSession(false);
+        return s != null && Boolean.TRUE.equals(s.getAttribute(AdminAuthInterceptor.SESSION_ADMIN));
+    }
+
+    private String currentAdminToken(HttpServletRequest request) {
+        HttpSession s = request.getSession(false);
+        if (s == null) return null;
+        Object token = s.getAttribute(AdminAuthInterceptor.SESSION_ADMIN_TOKEN);
+        return token instanceof String ? (String) token : null;
+    }
+
+    /** 已登录会话或表单密码正确 */
+    private boolean checkPasswordOrSession(HttpServletRequest request, String password) {
+        if (isAdminSession(request)) {
+            return true;
+        }
+        return checkPassword(password);
+    }
+
+    private static String safeRedirect(String redirect) {
+        if (redirect == null || redirect.isBlank()) {
+            return "/admin";
+        }
+        if (redirect.startsWith("//") || redirect.contains("://")) {
+            return "/admin";
+        }
+        if (!redirect.startsWith("/")) {
+            return "/admin";
+        }
+        return redirect;
+    }
+
 
     private String getClientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
@@ -65,9 +107,47 @@ public class AdminController {
         return "home";
     }
 
+    // ==================== 管理登录 ====================
+    @GetMapping("/admin/login")
+    public String loginPage(@RequestParam(required = false) String redirect,
+                            Model model,
+                            HttpServletRequest request) {
+        if (isAdminSession(request)) {
+            return "redirect:" + safeRedirect(redirect);
+        }
+        model.addAttribute("redirect", redirect != null && !redirect.isBlank() ? redirect : "/admin");
+        return "admin-login";
+    }
+
+    @PostMapping("/admin/login")
+    public String loginPost(@RequestParam String password,
+                            @RequestParam(required = false) String redirect,
+                            HttpServletRequest request,
+                            RedirectAttributes ra) {
+        if (!checkPassword(password)) {
+            ra.addFlashAttribute("message", "密码错误");
+            String r = URLEncoder.encode(safeRedirect(redirect), StandardCharsets.UTF_8);
+            return "redirect:/admin/login?redirect=" + r;
+        }
+        String token = UUID.randomUUID().toString().replace("-", "");
+        request.getSession().setAttribute(AdminAuthInterceptor.SESSION_ADMIN, Boolean.TRUE);
+        request.getSession().setAttribute(AdminAuthInterceptor.SESSION_ADMIN_TOKEN, token);
+        return "redirect:" + safeRedirect(redirect);
+    }
+
+    @GetMapping("/admin/logout")
+    public String logout(HttpServletRequest request) {
+        HttpSession s = request.getSession(false);
+        if (s != null) {
+            s.invalidate();
+        }
+        return "redirect:/admin/login";
+    }
+
     // ==================== 管理中心 ====================
     @GetMapping("/admin")
-    public String admin(Model model) {
+    public String admin(@RequestParam(name = "group_name", required = false) String groupName,
+                        Model model, HttpServletRequest request) {
         var groupRows = new java.util.ArrayList<java.util.Map<String, Object>>();
         for (String g : qrService.listGroups()) {
             var row = new java.util.HashMap<String, Object>();
@@ -76,6 +156,8 @@ public class AdminController {
             groupRows.add(row);
         }
         model.addAttribute("groupRows", groupRows);
+        model.addAttribute("prefillGroupName", groupName != null ? groupName.trim() : "");
+        model.addAttribute("adminToken", currentAdminToken(request));
         return "admin";
     }
 
@@ -85,7 +167,7 @@ public class AdminController {
                             @RequestParam(required = false) MultipartFile file,
                             HttpServletRequest request,
                             RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin";
         }
@@ -103,12 +185,12 @@ public class AdminController {
     }
 
     @PostMapping("/admin/rename")
-    public String rename(@RequestParam String password,
+    public String rename(@RequestParam(required = false) String password,
                          @RequestParam String old_name,
                          @RequestParam String new_name,
                          HttpServletRequest request,
                          RedirectAttributes ra) {
-        if (checkPassword(password) && new_name != null && !new_name.isBlank()) {
+        if (checkPasswordOrSession(request, password) && new_name != null && !new_name.isBlank()) {
             try {
                 qrService.renameGroup(old_name, new_name.trim());
                 String ip = getClientIp(request);
@@ -121,11 +203,11 @@ public class AdminController {
     }
 
     @PostMapping("/admin/delete/{groupName}")
-    public String delete(@RequestParam String password,
+    public String delete(@RequestParam(required = false) String password,
                          @PathVariable String groupName,
                          HttpServletRequest request,
                          RedirectAttributes ra) {
-        if (checkPassword(password)) {
+        if (checkPasswordOrSession(request, password)) {
             try {
                 qrService.deleteGroup(groupName);
                 String ip = getClientIp(request);
@@ -139,7 +221,7 @@ public class AdminController {
 
     // ==================== 统计看板 ====================
     @GetMapping("/admin/stats")
-    public String stats(Model model) throws com.fasterxml.jackson.core.JsonProcessingException {
+    public String stats(Model model, HttpServletRequest request) throws com.fasterxml.jackson.core.JsonProcessingException {
         var statsData = statsService.getStatsData();
         var statsList = new java.util.ArrayList<Map<String, Object>>();
         var chartDataList = new java.util.ArrayList<Map<String, Object>>();
@@ -156,6 +238,7 @@ public class AdminController {
         }
         model.addAttribute("statsList", statsList);
         model.addAttribute("chartDataJson", objectMapper.writeValueAsString(chartDataList));
+        model.addAttribute("adminToken", currentAdminToken(request));
         return "stats";
     }
 
@@ -174,9 +257,17 @@ public class AdminController {
         return chartDataList;
     }
 
+    // ==================== 未创建群码访问统计（3 天缓存） ====================
+    @GetMapping("/admin/missing-groups")
+    public String missingGroups(Model model) {
+        model.addAttribute("summaryRows", missingGroupVisitService.summaryRows());
+        model.addAttribute("recentRows", missingGroupVisitService.recentRows());
+        return "missing-groups";
+    }
+
     // ==================== 自定义文件 ====================
     @GetMapping("/admin/upload-file")
-    public String uploadPage(Model model) {
+    public String uploadPage(Model model, HttpServletRequest request) {
         try {
             List<String> files = java.nio.file.Files.list(qrService.getFilesDirPath())
                     .filter(java.nio.file.Files::isRegularFile)
@@ -187,14 +278,16 @@ public class AdminController {
         } catch (IOException e) {
             model.addAttribute("files", List.<String>of());
         }
+        model.addAttribute("adminToken", currentAdminToken(request));
         return "upload";
     }
 
     @PostMapping("/upload")
-    public String uploadFile(@RequestParam String password,
+    public String uploadFile(@RequestParam(required = false) String password,
                              @RequestParam MultipartFile file,
+                             HttpServletRequest request,
                              RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin/upload-file";
         }
@@ -223,10 +316,11 @@ public class AdminController {
      * 粘贴样式创建文件：解析「##文本内容」与「##」之间的内容，每行格式为「文件名 内容」。
      */
     @PostMapping("/admin/upload-file/paste")
-    public String pasteAndCreateFiles(@RequestParam String password,
+    public String pasteAndCreateFiles(@RequestParam(required = false) String password,
                                       @RequestParam String paste_content,
+                                      HttpServletRequest request,
                                       RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin/upload-file";
         }
@@ -287,10 +381,11 @@ public class AdminController {
     }
 
     @PostMapping("/admin/upload-file/delete")
-    public String deleteFile(@RequestParam String password,
+    public String deleteFile(@RequestParam(required = false) String password,
                              @RequestParam String filename,
+                             HttpServletRequest request,
                              RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin/upload-file";
         }
@@ -335,16 +430,17 @@ public class AdminController {
 
     // ==================== 微信公众号配置 ====================
     @GetMapping("/admin/notice")
-    public String notice(@RequestParam(required = false) Long edit, Model model) {
+    public String notice(@RequestParam(required = false) Long edit, Model model, HttpServletRequest request) {
         model.addAttribute("configs", templateRepository.findAllByOrderByUpdatedAtDescIdDesc());
         if (edit != null) {
             templateRepository.findById(edit).ifPresent(c -> model.addAttribute("editConfig", c));
         }
+        model.addAttribute("adminToken", currentAdminToken(request));
         return "notice";
     }
 
     @PostMapping("/admin/notice")
-    public String noticePost(@RequestParam String password,
+    public String noticePost(@RequestParam(required = false) String password,
                              @RequestParam(defaultValue = "save") String action,
                              @RequestParam(required = false) Long config_id,
                              @RequestParam(required = false) String name,
@@ -354,8 +450,9 @@ public class AdminController {
                              @RequestParam(required = false) String template_id,
                              @RequestParam(required = false) String template_data,
                              @RequestParam(required = false) String url,
+                             HttpServletRequest request,
                              RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin/notice";
         }
@@ -442,8 +539,11 @@ public class AdminController {
     }
 
     @PostMapping("/admin/notice/delete/{configId}")
-    public String deleteNoticeConfig(@RequestParam String password, @PathVariable Long configId, RedirectAttributes ra) {
-        if (!checkPassword(password)) {
+    public String deleteNoticeConfig(@RequestParam(required = false) String password,
+                                     @PathVariable Long configId,
+                                     HttpServletRequest request,
+                                     RedirectAttributes ra) {
+        if (!checkPasswordOrSession(request, password)) {
             ra.addFlashAttribute("message", "密码错误");
             return "redirect:/admin/notice";
         }

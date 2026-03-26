@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台登录</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f8f9fa; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        .card { width: 100%; max-width: 380px; background: white; padding: 32px 28px; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+        h2 { margin: 0 0 20px 0; font-size: 20px; color: #333; text-align: center; }
+        input[type="password"] { width: 100%; padding: 14px 14px; margin: 8px 0 16px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 15px; }
+        button { width: 100%; padding: 14px; background: #07c160; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        button:hover { opacity: 0.95; }
+        .msg { color: #ff4d4f; font-size: 14px; text-align: center; margin-bottom: 12px; }
+        .foot { margin-top: 20px; text-align: center; font-size: 13px; }
+        .foot a { color: #1890ff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>管理后台登录</h2>
+        <p th:if="${message}" class="msg" th:text="${message}"></p>
+        <form method="post" th:action="@{/admin/login}">
+            <input type="hidden" name="redirect" th:value="${redirect}">
+            <input type="password" name="password" placeholder="管理密码" required autocomplete="current-password" autofocus>
+            <button type="submit">登录</button>
+        </form>
+        <p class="foot"><a href="/">返回首页</a></p>
+    </div>
+</body>
+</html>

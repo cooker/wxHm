@@ -158,6 +158,13 @@ public class QrService {
         }
     }
 
+    public boolean groupExists(String groupName) {
+        if (groupName == null || groupName.isBlank()) return false;
+        if ("files".equals(groupName)) return false;
+        Path path = properties.getGroupPath(groupName);
+        return Files.isDirectory(path);
+    }
+
     public void renameGroup(String oldName, String newName) throws IOException {
         Files.move(properties.getGroupPath(oldName), properties.getGroupPath(newName));
     }

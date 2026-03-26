@@ -1,6 +1,7 @@
 package com.wxhm.controller;
 
 import com.wxhm.service.QrService;
+import com.wxhm.service.MissingGroupVisitService;
 import com.wxhm.util.PlatformUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
@@ -21,21 +22,29 @@ import java.nio.file.Path;
 public class GroupController {
 
     private final QrService qrService;
+    private final MissingGroupVisitService missingGroupVisitService;
 
-    public GroupController(QrService qrService) {
+    public GroupController(QrService qrService, MissingGroupVisitService missingGroupVisitService) {
         this.qrService = qrService;
+        this.missingGroupVisitService = missingGroupVisitService;
     }
 
     @GetMapping("/group/{groupName}")
     public String groupPage(@PathVariable String groupName, HttpServletRequest request, Model model) {
-        String qrFile = qrService.getActiveQr(groupName);
+        boolean groupExists = qrService.groupExists(groupName);
+        String qrFile = groupExists ? qrService.getActiveQr(groupName) : null;
 
         String userAgent = request.getHeader("User-Agent");
         String platform = PlatformUtils.parsePlatform(userAgent);
         String clientIp = qrService.getClientIp(request);
 
-        qrService.logVisit(groupName, clientIp, platform);
-        long todayVisitCount = qrService.countTodayVisits(groupName);
+        long todayVisitCount = 0;
+        if (groupExists) {
+            qrService.logVisit(groupName, clientIp, platform);
+            todayVisitCount = qrService.countTodayVisits(groupName);
+        } else {
+            missingGroupVisitService.logVisit(groupName, clientIp, platform);
+        }
 
         String wsrvUrl = "";
         if (qrFile != null) {
