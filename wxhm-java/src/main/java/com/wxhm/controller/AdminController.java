@@ -8,12 +8,12 @@ import com.wxhm.repository.WeChatTemplateRepository;
 import com.wxhm.service.QrService;
 import com.wxhm.service.StatsService;
 import com.wxhm.service.WeChatNotifyService;
-import com.wxhm.service.MissingGroupVisitService;
+import com.wxhm.service.AdminLoginSecurityService;
+import com.wxhm.util.PlatformUtils;
 import com.wxhm.wechat.WeChatApi;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -37,19 +37,20 @@ public class AdminController {
     private final QrService qrService;
     private final StatsService statsService;
     private final WeChatNotifyService weChatNotifyService;
-    private final MissingGroupVisitService missingGroupVisitService;
+    private final AdminLoginSecurityService adminLoginSecurityService;
     private final WeChatTemplateRepository templateRepository;
     private final WeChatApi weChatApi;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AdminController(WxHmProperties properties, QrService qrService, StatsService statsService,
-                           WeChatNotifyService weChatNotifyService, MissingGroupVisitService missingGroupVisitService, WeChatTemplateRepository templateRepository,
+                           WeChatNotifyService weChatNotifyService, AdminLoginSecurityService adminLoginSecurityService,
+                           WeChatTemplateRepository templateRepository,
                            WeChatApi weChatApi) {
         this.properties = properties;
         this.qrService = qrService;
         this.statsService = statsService;
         this.weChatNotifyService = weChatNotifyService;
-        this.missingGroupVisitService = missingGroupVisitService;
+        this.adminLoginSecurityService = adminLoginSecurityService;
         this.templateRepository = templateRepository;
         this.weChatApi = weChatApi;
     }
@@ -63,13 +64,6 @@ public class AdminController {
         return s != null && Boolean.TRUE.equals(s.getAttribute(AdminAuthInterceptor.SESSION_ADMIN));
     }
 
-    private String currentAdminToken(HttpServletRequest request) {
-        HttpSession s = request.getSession(false);
-        if (s == null) return null;
-        Object token = s.getAttribute(AdminAuthInterceptor.SESSION_ADMIN_TOKEN);
-        return token instanceof String ? (String) token : null;
-    }
-
     /** 已登录会话或表单密码正确 */
     private boolean checkPasswordOrSession(HttpServletRequest request, String password) {
         if (isAdminSession(request)) {
@@ -80,15 +74,32 @@ public class AdminController {
 
     private static String safeRedirect(String redirect) {
         if (redirect == null || redirect.isBlank()) {
-            return "/admin";
+            return "/app/admin";
         }
         if (redirect.startsWith("//") || redirect.contains("://")) {
-            return "/admin";
+            return "/app/admin";
         }
         if (!redirect.startsWith("/")) {
-            return "/admin";
+            return "/app/admin";
         }
         return redirect;
+    }
+
+    /** 将历史 /admin 路径转为 /app 下路径 */
+    private static String legacyToAppPath(String path) {
+        if (path == null || path.isBlank()) {
+            return "/app/admin";
+        }
+        if (path.startsWith("/app")) {
+            return path;
+        }
+        if (path.startsWith("/admin/upload-file")) {
+            return "/app/admin/upload";
+        }
+        if (path.startsWith("/admin")) {
+            return "/app" + path;
+        }
+        return "/app/admin";
     }
 
 
@@ -100,23 +111,21 @@ public class AdminController {
         return request.getRemoteAddr();
     }
 
-    // ==================== 首页 ====================
+    // ==================== 首页 → SPA ====================
     @GetMapping("/")
-    public String home(Model model) {
-        model.addAttribute("githubUrl", properties.getGithubUrl());
-        return "home";
+    public String home() {
+        return "redirect:/app/";
     }
 
     // ==================== 管理登录 ====================
     @GetMapping("/admin/login")
     public String loginPage(@RequestParam(required = false) String redirect,
-                            Model model,
                             HttpServletRequest request) {
         if (isAdminSession(request)) {
-            return "redirect:" + safeRedirect(redirect);
+            return "redirect:" + legacyToAppPath(safeRedirect(redirect));
         }
-        model.addAttribute("redirect", redirect != null && !redirect.isBlank() ? redirect : "/admin");
-        return "admin-login";
+        String target = legacyToAppPath(safeRedirect(redirect));
+        return "redirect:/app/admin/login?redirect=" + URLEncoder.encode(target, StandardCharsets.UTF_8);
     }
 
     @PostMapping("/admin/login")
@@ -124,15 +133,30 @@ public class AdminController {
                             @RequestParam(required = false) String redirect,
                             HttpServletRequest request,
                             RedirectAttributes ra) {
-        if (!checkPassword(password)) {
-            ra.addFlashAttribute("message", "密码错误");
-            String r = URLEncoder.encode(safeRedirect(redirect), StandardCharsets.UTF_8);
-            return "redirect:/admin/login?redirect=" + r;
+        String ip = getClientIp(request);
+        String platform = PlatformUtils.parsePlatform(request.getHeader("User-Agent"));
+        var lock = adminLoginSecurityService.lockState(ip);
+        if (lock.blocked()) {
+            ra.addFlashAttribute("message", "输入错误次数过多，请 " + lock.remainingMinutes() + " 分钟后再试");
+            String r = URLEncoder.encode(legacyToAppPath(safeRedirect(redirect)), StandardCharsets.UTF_8);
+            return "redirect:/app/admin/login?redirect=" + r;
         }
+        if (!checkPassword(password)) {
+            adminLoginSecurityService.recordAttempt(ip, platform, password, false);
+            var latest = adminLoginSecurityService.lockState(ip);
+            if (latest.blocked()) {
+                ra.addFlashAttribute("message", "输入错误次数过多，请 " + latest.remainingMinutes() + " 分钟后再试");
+            } else {
+                ra.addFlashAttribute("message", "密码错误");
+            }
+            String r = URLEncoder.encode(legacyToAppPath(safeRedirect(redirect)), StandardCharsets.UTF_8);
+            return "redirect:/app/admin/login?redirect=" + r;
+        }
+        adminLoginSecurityService.recordAttempt(ip, platform, null, true);
         String token = UUID.randomUUID().toString().replace("-", "");
         request.getSession().setAttribute(AdminAuthInterceptor.SESSION_ADMIN, Boolean.TRUE);
         request.getSession().setAttribute(AdminAuthInterceptor.SESSION_ADMIN_TOKEN, token);
-        return "redirect:" + safeRedirect(redirect);
+        return "redirect:" + legacyToAppPath(safeRedirect(redirect));
     }
 
     @GetMapping("/admin/logout")
@@ -141,24 +165,16 @@ public class AdminController {
         if (s != null) {
             s.invalidate();
         }
-        return "redirect:/admin/login";
+        return "redirect:/app/admin/login";
     }
 
     // ==================== 管理中心 ====================
     @GetMapping("/admin")
-    public String admin(@RequestParam(name = "group_name", required = false) String groupName,
-                        Model model, HttpServletRequest request) {
-        var groupRows = new java.util.ArrayList<java.util.Map<String, Object>>();
-        for (String g : qrService.listGroups()) {
-            var row = new java.util.HashMap<String, Object>();
-            row.put("name", g);
-            row.put("qrActive", qrService.hasActiveQr(g));
-            groupRows.add(row);
+    public String admin(@RequestParam(name = "group_name", required = false) String groupName) {
+        if (groupName != null && !groupName.isBlank()) {
+            return "redirect:/app/admin?group_name=" + URLEncoder.encode(groupName.trim(), StandardCharsets.UTF_8);
         }
-        model.addAttribute("groupRows", groupRows);
-        model.addAttribute("prefillGroupName", groupName != null ? groupName.trim() : "");
-        model.addAttribute("adminToken", currentAdminToken(request));
-        return "admin";
+        return "redirect:/app/admin";
     }
 
     @PostMapping("/admin")
@@ -221,25 +237,8 @@ public class AdminController {
 
     // ==================== 统计看板 ====================
     @GetMapping("/admin/stats")
-    public String stats(Model model, HttpServletRequest request) throws com.fasterxml.jackson.core.JsonProcessingException {
-        var statsData = statsService.getStatsData();
-        var statsList = new java.util.ArrayList<Map<String, Object>>();
-        var chartDataList = new java.util.ArrayList<Map<String, Object>>();
-        for (var e : statsData.entrySet()) {
-            var item = new java.util.HashMap<String, Object>();
-            item.put("groupName", e.getKey());
-            item.put("trendJson", objectMapper.writeValueAsString(e.getValue().get("trend")));
-            item.put("pieJson", objectMapper.writeValueAsString(e.getValue().get("pie")));
-            statsList.add(item);
-            var chartEntry = new java.util.HashMap<String, Object>();
-            chartEntry.put("trend", e.getValue().get("trend"));
-            chartEntry.put("pie", e.getValue().get("pie"));
-            chartDataList.add(chartEntry);
-        }
-        model.addAttribute("statsList", statsList);
-        model.addAttribute("chartDataJson", objectMapper.writeValueAsString(chartDataList));
-        model.addAttribute("adminToken", currentAdminToken(request));
-        return "stats";
+    public String stats() {
+        return "redirect:/app/admin/stats";
     }
 
     /** 统计看板数据接口，用于无感刷新（仅返回图表数据 JSON） */
@@ -259,27 +258,14 @@ public class AdminController {
 
     // ==================== 未创建群码访问统计（3 天缓存） ====================
     @GetMapping("/admin/missing-groups")
-    public String missingGroups(Model model) {
-        model.addAttribute("summaryRows", missingGroupVisitService.summaryRows());
-        model.addAttribute("recentRows", missingGroupVisitService.recentRows());
-        return "missing-groups";
+    public String missingGroups() {
+        return "redirect:/app/admin/missing-groups";
     }
 
     // ==================== 自定义文件 ====================
     @GetMapping("/admin/upload-file")
-    public String uploadPage(Model model, HttpServletRequest request) {
-        try {
-            List<String> files = java.nio.file.Files.list(qrService.getFilesDirPath())
-                    .filter(java.nio.file.Files::isRegularFile)
-                    .map(p -> p.getFileName().toString())
-                    .sorted()
-                    .toList();
-            model.addAttribute("files", files);
-        } catch (IOException e) {
-            model.addAttribute("files", List.<String>of());
-        }
-        model.addAttribute("adminToken", currentAdminToken(request));
-        return "upload";
+    public String uploadPage() {
+        return "redirect:/app/admin/upload";
     }
 
     @PostMapping("/upload")
@@ -411,7 +397,7 @@ public class AdminController {
     // ==================== 自定义文件根路径访问 ====================
     @GetMapping("/{filename}")
     public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> serveFile(@PathVariable String filename) {
-        if (filename.contains("/") || List.of("admin", "group", "uploads", "upload").contains(filename)) {
+        if (filename.contains("/") || List.of("admin", "group", "uploads", "upload", "app", "api").contains(filename)) {
             return org.springframework.http.ResponseEntity.notFound().build();
         }
         String safe = java.nio.file.Paths.get(filename).getFileName().toString();
@@ -430,13 +416,11 @@ public class AdminController {
 
     // ==================== 微信公众号配置 ====================
     @GetMapping("/admin/notice")
-    public String notice(@RequestParam(required = false) Long edit, Model model, HttpServletRequest request) {
-        model.addAttribute("configs", templateRepository.findAllByOrderByUpdatedAtDescIdDesc());
+    public String notice(@RequestParam(required = false) Long edit) {
         if (edit != null) {
-            templateRepository.findById(edit).ifPresent(c -> model.addAttribute("editConfig", c));
+            return "redirect:/app/admin/notice?edit=" + edit;
         }
-        model.addAttribute("adminToken", currentAdminToken(request));
-        return "notice";
+        return "redirect:/app/admin/notice";
     }
 
     @PostMapping("/admin/notice")

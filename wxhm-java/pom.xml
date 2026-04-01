@@ -19,6 +19,8 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- 设为 false 可在 package 前自动执行 wxhm-web 的 npm install && npm run build（需本机已安装 Node/npm） -->
+        <wxhm.skip.frontend>true</wxhm.skip.frontend>
     </properties>
 
     <dependencies>
@@ -54,6 +56,37 @@
     <build>
         <finalName>app</finalName>
         <plugins>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>1.15.1</version>
+                <configuration>
+                    <workingDirectory>${project.basedir}/../wxhm-web</workingDirectory>
+                    <skip>${wxhm.skip.frontend}</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>npm install</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <arguments>install</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm run build</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

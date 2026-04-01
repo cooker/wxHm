@@ -1,69 +1,85 @@
-# wxHm (Java版)
+# wxHm (Java + NutUI-Vue)
 
-微信群活码管理系统（Spring Boot + SQLite + Thymeleaf）。
-
-核心目标：使用固定链接分发群码，自动处理过期二维码，并提供后台管理、数据看板和公众号模板消息能力。
+微信群活码管理系统，后端基于 Spring Boot + SQLite，前端基于 Vue3 + NutUI，支持群码轮转、数据看板、文件托管与后台风控。
 
 ---
 
-## 功能概览
+## 项目现状（重要）
 
-- 固定访问地址：`/group/{groupName}`
-- 群码自动过期：超过配置天数后自动清理
-- 管理后台登录保护：登录后才可访问管理页面
-- 管理中心：上传/替换群码、内联改名、删除群组
-- 数据看板：7日 PV/UV 趋势 + 今日设备分布（ECharts）
-- 自定义文件：上传、粘贴批量创建、删除、根路径访问
-- 微信公众号模板消息：配置、保存、发送测试
-- 未创建群码访问统计：统计访问了不存在群码链接的请求（保留 3 天）
+- 已完成从旧模板页向 SPA 迁移，主入口为：`/app/`
+- 根路径自定义文件访问仍保留：`/{filename}`
+- 旧链接兼容：
+  - `/` 会跳转到 `/app/`
+  - `/group/{groupName}` 会跳转到 `/app/group/{groupName}`
+
+---
+
+## 核心功能
+
+- 活码访问与轮转：固定群入口，后台上传新码即可替换
+- 群码访问统计：7 日 PV/UV 趋势 + 设备分布（ECharts）
+- 未创建群码访问监控：统计访问不存在群码链接的请求（3 天保留）
+- 自定义文件托管：上传、批量创建、预览、删除，支持 `/{filename}` 直链
+- 后台登录与会话鉴权：Session + `X-Admin-Token`
+- 登录风控与审计：
+  - 记录登录失败的 IP、设备、输入错误密码、时间
+  - 同 IP 30 分钟内输错 5 次，锁定 30 分钟
+  - 后台提供“登录监控”页面查看最近记录
+- 公众号模板消息：配置、发送测试、维护多套配置
 
 ---
 
 ## 技术栈
 
+### 后端（`wxhm-java`）
+
 - Java 21
 - Spring Boot 3.2.5
-  - `spring-boot-starter-web`
-  - `spring-boot-starter-data-jpa`
-  - `spring-boot-starter-thymeleaf`
-- SQLite (`org.xerial:sqlite-jdbc`)
-- Hibernate SQLite 方言 (`hibernate-community-dialects`)
-- WebP 写入支持 (`org.sejda.imageio:webp-imageio`，失败自动回退 PNG)
+- Spring MVC + Spring Data JPA
+- SQLite + Hibernate SQLite Dialect
+- Thymeleaf（保留少量兼容入口）
+
+### 前端（`wxhm-web`）
+
+- Vue 3 + Vue Router
+- NutUI
+- ECharts
+- Vite（`base=/app/`，构建产物输出到 Java `static/app`）
 
 ---
 
 ## 目录结构
 
-- `wxhm-java/`：Java 主项目
-  - `src/main/java/com/wxhm/controller/`：页面和接口控制器
-  - `src/main/java/com/wxhm/service/`：核心业务逻辑
+- `wxhm-java/`：后端工程
+  - `src/main/java/com/wxhm/controller/`：页面跳转与 API 控制器
+  - `src/main/java/com/wxhm/service/`：业务服务（统计、风控、群码、通知）
   - `src/main/java/com/wxhm/entity/`：JPA 实体
-  - `src/main/java/com/wxhm/repository/`：数据访问层
-  - `src/main/resources/templates/`：后台与前台页面模板
-  - `src/main/resources/application.yml`：应用配置
+  - `src/main/java/com/wxhm/repository/`：数据仓储
+  - `src/main/resources/static/app/`：前端打包产物（由 `wxhm-web` 构建同步）
+  - `src/main/resources/application.yml`：配置
+- `wxhm-web/`：NutUI-Vue 前端工程
 - `cf-workers/`：Cloudflare Workers 反向代理示例
-
-> 根目录的旧 Python 运行链路已移除，当前以 `wxhm-java` 为准。
-
----
-
-## 环境要求
-
-- JDK 21+
-- Maven 3.8+
 
 ---
 
 ## 快速启动
 
-### 1) 编译
+### 1) 构建前端（同步到 Java static）
+
+```bash
+cd wxhm-web
+npm install
+npm run build
+```
+
+### 2) 构建后端
 
 ```bash
 cd wxhm-java
 mvn clean package -DskipTests
 ```
 
-### 2) 运行
+### 3) 运行
 
 ```bash
 java -jar target/app.jar
@@ -71,10 +87,25 @@ java -jar target/app.jar
 
 默认端口：`8092`
 
-启动后访问：
+常用地址：
 
-- 首页：`http://127.0.0.1:8092/`
-- 后台登录：`http://127.0.0.1:8092/admin/login`
+- 前端首页：`http://127.0.0.1:8092/app/`
+- 管理登录：`http://127.0.0.1:8092/app/admin/login`
+- 兼容群链接：`http://127.0.0.1:8092/group/你的群名`
+
+---
+
+## 一键脚本
+
+根目录提供：
+
+- `start.sh`：启动（按执行时当前目录写 `run/app.pid` 与 `logs/app.out.log`）
+- `stop.sh`：停止（优雅停止，超时强制结束）
+
+```bash
+./start.sh
+./stop.sh
+```
 
 ---
 
@@ -82,109 +113,54 @@ java -jar target/app.jar
 
 配置文件：`wxhm-java/src/main/resources/application.yml`
 
-关键项：
+关键配置：
 
-- `server.port`：服务端口（默认 `8092`）
-- `spring.datasource.url`：SQLite 数据库路径（默认 `jdbc:sqlite:stats.db`）
-- `wxhm.upload-base`：群码根目录（默认 `/data/wxHm/uploads`）
-- `wxhm.files-dir`：自定义文件目录（默认 `/data/wxHm/uploads/files`）
-- `wxhm.expire-days`：群码过期天数（默认 `7`）
-- `wxhm.admin-password`：后台管理密码（支持环境变量覆盖）
+- `server.port`：端口（默认 `8092`）
+- `spring.datasource.url`：SQLite 地址（默认 `jdbc:sqlite:stats.db`）
+- `wxhm.upload-base`：群码目录
+- `wxhm.files-dir`：自定义文件目录
+- `wxhm.expire-days`：群码有效天数
+- `wxhm.admin-password`：后台密码（建议走环境变量）
 
-### 推荐用环境变量覆盖管理密码
+推荐：
 
 ```bash
 export ADMIN_PASSWORD=your_strong_password
-java -jar target/app.jar
 ```
 
 ---
 
-## 后台页面说明
+## API 概览
 
-登录后先进入管理中心，通过卡片菜单进入各功能页。
+### 公开接口
 
-### 1) 管理中心 `/admin`
+- `GET /api/public/home`
+- `GET /api/public/group/{groupName}`
 
-- 上传并发布群码
-- 点击群名直接改名（失焦自动提交）
-- 群状态标识：`有效` / `已失效`
-- 操作：预览、修改群码、删除
+### 管理接口（需登录）
 
-### 2) 数据看板 `/admin/stats`
-
-- 多群组 7 日趋势（PV/UV）
-- 今日设备分布
-- 自动刷新 / 手动刷新
-- 图表数据通过 `/admin/stats/data` 无感更新
-
-### 3) 自定义文件 `/admin/upload-file`
-
-- 上传文件
-- 粘贴样式批量创建文件
-- 文件列表删除
-- 文件可通过 `/{filename}` 访问
-
-### 4) 公众号维护 `/admin/notice`
-
-- 读取最新配置
-- 保存/更新模板配置
-- 发送测试模板消息
-- 删除配置
-
-### 5) 未创建群码访问 `/admin/missing-groups`
-
-- 统计访问了不存在群码链接的请求
-- 汇总（按群名 PV/UV）+ 最近访问明细
-- 数据自动保留 3 天（超期自动清理）
+- 会话：`/api/admin/login`、`/api/admin/logout`、`/api/admin/session`
+- 群码：`/api/admin/groups`、`/api/admin/groups/upload`、`/api/admin/groups/rename`、`/api/admin/groups/{groupName}`
+- 统计：`/api/admin/stats`、`/api/admin/stats/data`
+- 自定义文件：`/api/admin/files`、`/api/admin/files/upload`、`/api/admin/files/paste`、`/api/admin/files/delete`
+- 未创建群码：`/api/admin/missing-groups`
+- 登录监控：`/api/admin/login-monitor`
+- 公众号：`/api/admin/notice/*`
 
 ---
 
-## 访问与统计逻辑
+## 后台页面（SPA）
 
-- 访问 `/group/{groupName}` 时：
-  - 若群存在：记录正常访问日志（`VisitLog`）
-  - 若群不存在：记录到 `MissingGroupVisit`
-- 正常统计看板使用 `VisitLog`
-- 未创建群码统计使用 `MissingGroupVisit`
-
----
-
-## 微信模板消息
-
-可在 `/admin/notice` 配置：
-
-- `appid`
-- `secret`
-- `touser`
-- `template_id`
-- `template_data`（JSON）
-- `url`（可选）
-
-模板数据建议结构：
-
-```json
-{
-  "group": { "value": "" },
-  "action": { "value": "" },
-  "server": { "value": "" },
-  "user": { "value": "" },
-  "time": { "value": "" }
-}
-```
-
-自动触发场景：
-
-- 管理员更新群码
-- 管理员更名群码
-- 管理员删除群码
-- 群码过期自动清理
+- `/app/admin`：管理中心（卡片菜单、上传群码、改名、换码、删群）
+- `/app/admin/stats`：数据看板
+- `/app/admin/upload`：自定义文件（含预览）
+- `/app/admin/notice`：公众号模板配置
+- `/app/admin/missing-groups`：未创建群码访问统计
+- `/app/admin/login-monitor`：登录失败监控（IP/设备/错误密码）
 
 ---
 
-## 反向代理与真实 IP
-
-项目通过 `X-Forwarded-For` 获取客户端 IP。若使用 Nginx，请透传：
+## 反向代理建议（Nginx）
 
 ```nginx
 location / {
@@ -195,50 +171,53 @@ location / {
 }
 ```
 
+说明：
+
+- 系统通过 `X-Forwarded-For` 识别真实 IP（用于统计与登录风控）
+
 ---
 
-## Cloudflare Workers 代理（可选）
+## 构建说明（Maven + 前端）
 
-目录：`cf-workers/`
+`wxhm-java/pom.xml` 已包含 `frontend-maven-plugin`，默认属性：
 
-可用于将 CF 域名请求转发到后端（支持非标准端口）。
-详细步骤见：`cf-workers/README.md`
+- `wxhm.skip.frontend=true`（默认跳过 npm 构建，适合无 Node 环境）
+
+如需在 Maven 打包时自动构建前端：
+
+```bash
+cd wxhm-java
+mvn clean package -DskipTests -Dwxhm.skip.frontend=false
+```
+
+（前提：本机已安装 Node/npm）
 
 ---
 
 ## 常见问题
 
-### 1) 后台提示未登录/跳回登录页
+### 1) 前端改了但页面没更新
 
-- 检查 Cookie/Session 是否被浏览器拦截
-- 反向代理需保留会话相关 Header 与 Cookie
+- 在 `wxhm-web` 执行 `npm run build`
+- 确认产物写入 `wxhm-java/src/main/resources/static/app`
+- 再重启 Java 进程
 
-### 2) 微信模板消息发送失败
+### 2) 后台提示未登录
 
-- 检查 `appid/secret/touser/template_id`
-- 检查公众号接口权限、IP 白名单
-- 查看服务日志中的错误输出
+- 检查浏览器是否拦截 Cookie
+- 反向代理是否透传会话
 
-### 3) 群码上传成功但前台不显示
+### 3) 登录被限制
 
-- 检查群名目录下是否有有效图片
-- 检查 `wxhm.expire-days` 是否过短
-- 确认服务器时间是否正确
+- 触发条件：同一 IP 30 分钟内连续输错 5 次
+- 锁定时长：30 分钟
+- 可在后台“登录监控”查看失败记录
 
----
+### 4) 自定义文件访问 404
 
-## 开发命令
-
-```bash
-# 编译
-cd wxhm-java && mvn clean compile
-
-# 打包
-cd wxhm-java && mvn clean package -DskipTests
-
-# 运行
-cd wxhm-java && java -jar target/app.jar
-```
+- 检查文件是否在 `/app/admin/upload` 列表中
+- 访问方式应为：`https://域名/文件名`
+- 文件名避免与保留路径冲突：`app`、`api`、`admin`、`group`、`uploads` 等
 
 ---
 
@@ -250,12 +229,6 @@ MIT
 
 ## 项目地址
 
-- GitHub: https://github.com/cooker/wxHm
+- GitHub: [https://github.com/cooker/wxHm](https://github.com/cooker/wxHm)
 
-如果你觉得这个项目有帮助，请给一个 Star ⭐️！
-
-![](zsm.jpg)
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=cooker/wxHm&type=date&legend=top-left)](https://www.star-history.com/#cooker/wxHm&type=date&legend=top-left)
+如果这个项目对你有帮助，欢迎 Star。

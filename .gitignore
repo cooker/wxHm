@@ -39,3 +39,6 @@ Thumbs.db
 .idea/
 *.swp
 instance/*
+
+# 前端依赖
+wxhm-web/node_modules/

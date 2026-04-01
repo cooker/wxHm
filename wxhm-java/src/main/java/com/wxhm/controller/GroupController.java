@@ -1,67 +1,35 @@
 package com.wxhm.controller;
 
 import com.wxhm.service.QrService;
-import com.wxhm.service.MissingGroupVisitService;
-import com.wxhm.util.PlatformUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.servlet.view.RedirectView;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 /**
- * 群码展示、静态资源
+ * 兼容旧群链接；群码图片直出。
  */
 @Controller
 public class GroupController {
 
     private final QrService qrService;
-    private final MissingGroupVisitService missingGroupVisitService;
 
-    public GroupController(QrService qrService, MissingGroupVisitService missingGroupVisitService) {
+    public GroupController(QrService qrService) {
         this.qrService = qrService;
-        this.missingGroupVisitService = missingGroupVisitService;
     }
 
     @GetMapping("/group/{groupName}")
-    public String groupPage(@PathVariable String groupName, HttpServletRequest request, Model model) {
-        boolean groupExists = qrService.groupExists(groupName);
-        String qrFile = groupExists ? qrService.getActiveQr(groupName) : null;
-
-        String userAgent = request.getHeader("User-Agent");
-        String platform = PlatformUtils.parsePlatform(userAgent);
-        String clientIp = qrService.getClientIp(request);
-
-        long todayVisitCount = 0;
-        if (groupExists) {
-            qrService.logVisit(groupName, clientIp, platform);
-            todayVisitCount = qrService.countTodayVisits(groupName);
-        } else {
-            missingGroupVisitService.logVisit(groupName, clientIp, platform);
-        }
-
-        String wsrvUrl = "";
-        if (qrFile != null) {
-            String host = request.getHeader("Host");
-            if (host == null) host = "localhost:8092";
-            String scheme = request.getHeader("X-Forwarded-Proto");
-            if (scheme == null || scheme.isBlank()) scheme = "https";
-            String rawUrl = scheme + "://" + host + "/uploads/" + groupName + "/" + qrFile;
-//            wsrvUrl = "https://wsrv.nl/?url=" + URLEncoder.encode(rawUrl, StandardCharsets.UTF_8) + "&we=1&v=" + System.currentTimeMillis() / 1000;
-            wsrvUrl = rawUrl + "?we=1&v=" + System.currentTimeMillis() / 1000;
-        }
-
-        model.addAttribute("groupName", groupName);
-        model.addAttribute("qrFile", qrFile);
-        model.addAttribute("wsrvUrl", wsrvUrl);
-        model.addAttribute("todayVisitCount", todayVisitCount);
-        return "index";
+    public RedirectView groupLegacy(@PathVariable String groupName) {
+        String encoded = UriUtils.encodePathSegment(groupName, StandardCharsets.UTF_8);
+        return new RedirectView("/app/group/" + encoded);
     }
 
     @GetMapping("/uploads/{groupName}/{filename}")

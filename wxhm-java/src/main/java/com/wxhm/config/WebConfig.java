@@ -20,8 +20,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(adminAuthInterceptor)
-                .addPathPatterns("/admin/**", "/upload")
-                .excludePathPatterns("/admin/login");
+                .addPathPatterns("/admin/**", "/upload", "/api/admin/**")
+                .excludePathPatterns("/admin/login", "/api/admin/login", "/api/admin/session");
     }
 
     @Bean
