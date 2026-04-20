@@ -37,6 +37,14 @@
     </div>
 
     <div class="card">
+      <h4>问卷链接配置</h4>
+      <p class="tip">仅支持全局配置，链接为空表示关闭。</p>
+      <nut-input v-model="globalSurveyUrl" placeholder="全局默认问卷链接（https://...）" />
+      <nut-input v-model="globalSurveyText" class="mt8" placeholder="全局按钮文案（默认：填写问卷）" />
+      <nut-button type="primary" plain block class="mt" @click="saveGlobalSurvey">保存全局配置</nut-button>
+    </div>
+
+    <div class="card">
       <h4>群组列表</h4>
       <div v-for="g in groups" :key="g.name" class="row">
         <div class="left">
@@ -71,16 +79,26 @@ const replaceRef = ref(null)
 const replaceTarget = ref('')
 const editing = ref('')
 const editName = ref('')
+const globalSurveyUrl = ref('')
+const globalSurveyText = ref('')
 
 async function loadGroups() {
   const { ok, data } = await apiJson('/api/admin/groups')
   if (ok && Array.isArray(data)) groups.value = data
 }
 
+async function loadSurveyConfig() {
+  const { ok, data } = await apiJson('/api/admin/survey/config')
+  if (!ok || !data) return
+  globalSurveyUrl.value = data.globalUrl || ''
+  globalSurveyText.value = data.globalButtonText || ''
+}
+
 onMounted(async () => {
   const q = route.query.group_name
   if (q) groupName.value = String(q)
   await loadGroups()
+  await loadSurveyConfig()
 })
 
 function pickFile() {
@@ -165,6 +183,22 @@ async function removeGroup(name) {
   }
 }
 
+async function saveGlobalSurvey() {
+  const { ok, data } = await apiJson('/api/admin/survey/config/global', {
+    method: 'POST',
+    body: JSON.stringify({
+      survey_url: globalSurveyUrl.value,
+      button_text: globalSurveyText.value,
+    }),
+  })
+  if (ok && data?.ok) {
+    showToast.success(data.message || '已保存')
+    await loadSurveyConfig()
+  } else {
+    showToast.text(data?.message || '保存失败')
+  }
+}
+
 async function logout() {
   await apiJson('/api/admin/logout', { method: 'POST', body: '{}' })
   setAdminToken(null)
@@ -198,8 +232,10 @@ async function logout() {
   box-shadow: 0 2px 10px rgba(0,0,0,.05);
 }
 .card h4 { margin: 0 0 12px; font-size: 15px; }
+.tip { margin: 0 0 10px; color: #999; font-size: 12px; }
 .file, .hidden { display: none; }
 .mt { margin-top: 12px; }
+.mt8 { margin-top: 8px; }
 .row {
   display: flex;
   flex-direction: column;

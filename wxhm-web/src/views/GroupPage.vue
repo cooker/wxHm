@@ -25,6 +25,24 @@
         <nut-button type="primary" block class="save-btn" @click="saveQr">保存到本地</nut-button>
       </template>
       <p v-else class="empty">暂无有效二维码</p>
+      <nut-button
+        v-if="surveyUrl"
+        block
+        plain
+        type="success"
+        class="survey-btn"
+        @click="openSurvey"
+      >
+        {{ surveyButtonText }}
+      </nut-button>
+    </div>
+    <div class="wave-wrap" aria-hidden="true">
+      <svg class="wave wave-back" viewBox="0 0 1440 120" preserveAspectRatio="none">
+        <path d="M0,64L48,69.3C96,75,192,85,288,85.3C384,85,480,75,576,69.3C672,64,768,64,864,64C960,64,1056,64,1152,69.3C1248,75,1344,85,1392,90.7L1440,96L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z" />
+      </svg>
+      <svg class="wave wave-front" viewBox="0 0 1440 120" preserveAspectRatio="none">
+        <path d="M0,96L40,90.7C80,85,160,75,240,64C320,53,400,43,480,42.7C560,43,640,53,720,58.7C800,64,880,64,960,64C1040,64,1120,64,1200,69.3C1280,75,1360,85,1400,90.7L1440,96L1440,120L1400,120C1360,120,1280,120,1200,120C1120,120,1040,120,960,120C880,120,800,120,720,120C640,120,560,120,480,120C400,120,320,120,240,120C160,120,80,120,40,120L0,120Z" />
+      </svg>
     </div>
   </div>
 </template>
@@ -45,6 +63,8 @@ const todayVisitCount = ref(0)
 const imgSrc = ref('')
 const fallbackUrl = ref('')
 const wechat = ref(false)
+const surveyUrl = ref('')
+const surveyButtonText = ref('填写问卷')
 
 onMounted(async () => {
   const ua = navigator.userAgent.toLowerCase()
@@ -57,6 +77,8 @@ onMounted(async () => {
   wsrvUrl.value = data.wsrvUrl || ''
   todayVisitCount.value = data.todayVisitCount ?? 0
   imgSrc.value = data.wsrvUrl || ''
+  surveyUrl.value = data.surveyUrl || ''
+  surveyButtonText.value = data.surveyButtonText || '填写问卷'
   const origin = window.location.origin
   fallbackUrl.value = `${origin}/uploads/${encodeURIComponent(groupName.value)}/${encodeURIComponent(data.qrFile || '')}`
 })
@@ -70,10 +92,29 @@ function onImgError() {
 function saveQr() {
   if (fallbackUrl.value) window.open(fallbackUrl.value, '_blank')
 }
+
+function openSurvey() {
+  if (!surveyUrl.value) return
+  const clickUrl = `/api/public/group/${encodeURIComponent(groupName.value)}/survey-click`
+  fetch(clickUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+    keepalive: true,
+    credentials: 'include',
+  }).catch(() => {})
+  window.open(surveyUrl.value, '_blank', 'noopener,noreferrer')
+}
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: #f0f2f5; }
+.page {
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 72px;
+  background: linear-gradient(180deg, #f7fafc 0%, #eef6ff 100%);
+  overflow: hidden;
+}
 .wechat-tip {
   background: linear-gradient(135deg, #07c160, #06ae56);
   color: #fff;
@@ -140,5 +181,39 @@ h3 { margin: 0 0 12px; font-size: 18px; }
 .ok { color: #07c160; font-weight: 600; margin: 8px 0; }
 .hint { color: #888; font-size: 13px; margin: 0 0 12px; }
 .empty { color: #999; padding: 40px 0; }
+.survey-btn { margin: 0 0 8px; }
 .save-btn { margin-top: 8px; }
+.wave-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 120px;
+  pointer-events: none;
+}
+.wave {
+  position: absolute;
+  left: 0;
+  width: 200%;
+  height: 100%;
+}
+.wave path { fill: rgba(153, 208, 255, 0.42); }
+.wave-back {
+  bottom: 0;
+  opacity: 0.65;
+  animation: waveMove 18s linear infinite;
+}
+.wave-front {
+  bottom: -6px;
+  opacity: 0.95;
+  animation: waveMoveReverse 12s linear infinite;
+}
+@keyframes waveMove {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes waveMoveReverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
 </style>

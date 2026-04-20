@@ -54,6 +54,7 @@ function buildOption(item) {
       series: [
         { name: 'PV', type: 'line', smooth: true, areaStyle: { opacity: 0.1 }, data: trendArr.map(t => t?.pv ?? 0), itemStyle: { color: '#1890ff' } },
         { name: 'UV', type: 'line', smooth: true, data: trendArr.map(t => t?.uv ?? 0), itemStyle: { color: '#07c160' } },
+        { name: '问卷点击', type: 'line', smooth: true, data: trendArr.map(t => t?.surveyClicks ?? 0), itemStyle: { color: '#fa8c16' } },
       ],
     },
     pie: {
