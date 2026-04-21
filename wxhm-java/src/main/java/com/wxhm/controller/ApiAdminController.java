@@ -10,6 +10,7 @@ import com.wxhm.service.QrService;
 import com.wxhm.service.StatsService;
 import com.wxhm.service.WeChatNotifyService;
 import com.wxhm.service.AdminLoginSecurityService;
+import com.wxhm.service.SurveyConfigService;
 import com.wxhm.util.PlatformUtils;
 import com.wxhm.wechat.WeChatApi;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +38,7 @@ public class ApiAdminController {
     private final WeChatNotifyService weChatNotifyService;
     private final AdminLoginSecurityService adminLoginSecurityService;
     private final MissingGroupVisitService missingGroupVisitService;
+    private final SurveyConfigService surveyConfigService;
     private final WeChatTemplateRepository templateRepository;
     private final WeChatApi weChatApi;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -44,6 +46,7 @@ public class ApiAdminController {
     public ApiAdminController(WxHmProperties properties, QrService qrService, StatsService statsService,
                               WeChatNotifyService weChatNotifyService, AdminLoginSecurityService adminLoginSecurityService,
                               MissingGroupVisitService missingGroupVisitService,
+                              SurveyConfigService surveyConfigService,
                               WeChatTemplateRepository templateRepository, WeChatApi weChatApi) {
         this.properties = properties;
         this.qrService = qrService;
@@ -51,6 +54,7 @@ public class ApiAdminController {
         this.weChatNotifyService = weChatNotifyService;
         this.adminLoginSecurityService = adminLoginSecurityService;
         this.missingGroupVisitService = missingGroupVisitService;
+        this.surveyConfigService = surveyConfigService;
         this.templateRepository = templateRepository;
         this.weChatApi = weChatApi;
     }
@@ -269,6 +273,22 @@ public class ApiAdminController {
         } catch (IOException e) {
             return List.of();
         }
+    }
+
+    @GetMapping("/survey/config")
+    public Map<String, Object> surveyConfig() {
+        return Map.of(
+                "globalUrl", surveyConfigService.getGlobalUrl(),
+                "globalButtonText", surveyConfigService.getGlobalButtonText()
+        );
+    }
+
+    @PostMapping("/survey/config/global")
+    public ResponseEntity<Map<String, Object>> saveGlobalSurvey(@RequestBody Map<String, String> body) {
+        String surveyUrl = body != null ? body.get("survey_url") : null;
+        String buttonText = body != null ? body.get("button_text") : null;
+        surveyConfigService.saveGlobalConfig(surveyUrl, buttonText);
+        return ResponseEntity.ok(Map.of("ok", true, "message", "全局问卷链接已更新"));
     }
 
     @PostMapping("/files/upload")

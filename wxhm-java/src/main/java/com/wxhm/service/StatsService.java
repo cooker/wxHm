@@ -1,6 +1,7 @@
 package com.wxhm.service;
 
 import com.wxhm.config.WxHmProperties;
+import com.wxhm.repository.SurveyClickLogRepository;
 import com.wxhm.repository.VisitLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +21,14 @@ import java.util.stream.Collectors;
 public class StatsService {
 
     private final VisitLogRepository visitLogRepository;
+    private final SurveyClickLogRepository surveyClickLogRepository;
     private final QrService qrService;
     private final WxHmProperties properties;
 
-    public StatsService(VisitLogRepository visitLogRepository, QrService qrService, WxHmProperties properties) {
+    public StatsService(VisitLogRepository visitLogRepository, SurveyClickLogRepository surveyClickLogRepository,
+                        QrService qrService, WxHmProperties properties) {
         this.visitLogRepository = visitLogRepository;
+        this.surveyClickLogRepository = surveyClickLogRepository;
         this.qrService = qrService;
         this.properties = properties;
     }
@@ -39,6 +43,7 @@ public class StatsService {
 
         String beforeDate = LocalDate.now().minusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE);
         visitLogRepository.deleteByDateBefore(beforeDate);
+        surveyClickLogRepository.deleteByDateBefore(beforeDate);
 
         Map<String, Map<String, Object>> result = new LinkedHashMap<>();
         for (String group : qrService.listGroups()) {
@@ -46,7 +51,8 @@ public class StatsService {
             for (String d : dates) {
                 long pv = visitLogRepository.countByGroupNameAndDate(group, d);
                 long uv = visitLogRepository.countDistinctIpByGroupNameAndDate(group, d);
-                trend.add(Map.of("date", d, "pv", pv, "uv", uv));
+                long surveyClicks = surveyClickLogRepository.countByGroupNameAndDate(group, d);
+                trend.add(Map.of("date", d, "pv", pv, "uv", uv, "surveyClicks", surveyClicks));
             }
 
             List<Map<String, Object>> pie = visitLogRepository
