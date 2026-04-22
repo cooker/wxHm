@@ -57,6 +57,20 @@
           <nut-button size="small" type="primary" plain @click="replaceQr(g.name)">换码</nut-button>
           <nut-button size="small" type="danger" plain @click="removeGroup(g.name)">删除</nut-button>
         </div>
+        <div class="meta">
+          <div class="short-row">
+            <span class="label">短链名：</span>
+            <nut-input
+              v-model="shortNameInputs[g.name]"
+              placeholder="例如 team1"
+              @blur="saveShortName(g.name)"
+              @keyup.enter="saveShortName(g.name)"
+            />
+          </div>
+          <span>访问量：{{ g.visitCount ?? 0 }}</span>
+          <span>最近访问时间：{{ formatVisitTime(g.recentVisitTime) }}</span>
+          <span>过期倒计时：{{ formatCountdown(g.expireCountdownSeconds, g.qrActive) }}</span>
+        </div>
       </div>
       <p v-if="!groups.length" class="empty">暂无群组</p>
     </div>
@@ -81,10 +95,31 @@ const editing = ref('')
 const editName = ref('')
 const globalSurveyUrl = ref('')
 const globalSurveyText = ref('')
+const shortNameInputs = ref({})
 
 async function loadGroups() {
   const { ok, data } = await apiJson('/api/admin/groups')
-  if (ok && Array.isArray(data)) groups.value = data
+  if (ok && Array.isArray(data)) {
+    groups.value = data
+    const next = {}
+    for (const g of data) next[g.name] = g.shortName || ''
+    shortNameInputs.value = next
+  }
+}
+
+function formatVisitTime(v) {
+  if (!v) return '-'
+  return String(v).replace('T', ' ').slice(0, 19)
+}
+
+function formatCountdown(seconds, qrActive) {
+  if (!qrActive) return '已过期'
+  const s = Number(seconds || 0)
+  if (s <= 0) return '已过期'
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return `${d}天 ${h}小时 ${m}分钟`
 }
 
 async function loadSurveyConfig() {
@@ -183,6 +218,30 @@ async function removeGroup(name) {
   }
 }
 
+async function saveShortName(groupName) {
+  const current = shortNameInputs.value[groupName] || ''
+  const row = groups.value.find(g => g.name === groupName)
+  if (!row) return
+  if ((row.shortName || '') === current) return
+  const { ok, data } = await apiJson('/api/admin/groups/short-name', {
+    method: 'POST',
+    body: JSON.stringify({
+      group_name: groupName,
+      short_name: current,
+    }),
+  })
+  if (ok && data?.ok) {
+    const saved = data.shortName || ''
+    shortNameInputs.value[groupName] = saved
+    const idx = groups.value.findIndex(g => g.name === groupName)
+    if (idx >= 0) groups.value[idx].shortName = saved
+    showToast.success(data.message || '已保存')
+  } else {
+    showToast.text(data?.message || '保存失败')
+    shortNameInputs.value[groupName] = row.shortName || ''
+  }
+}
+
 async function saveGlobalSurvey() {
   const { ok, data } = await apiJson('/api/admin/survey/config/global', {
     method: 'POST',
@@ -246,5 +305,8 @@ async function logout() {
 .left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .name { font-weight: 600; cursor: pointer; }
 .ops { display: flex; gap: 6px; flex-wrap: wrap; }
+.meta { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #666; }
+.short-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.label { color: #666; }
 .empty { color: #999; font-size: 13px; text-align: center; padding: 16px; }
 </style>

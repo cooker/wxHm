@@ -53,7 +53,8 @@ import { useRoute } from 'vue-router'
 import { apiJson } from '@/api/client'
 
 const route = useRoute()
-const groupName = computed(() => route.params.groupName || '')
+const routeName = computed(() => route.params.groupName || '')
+const groupName = ref('')
 const title = computed(() => (groupName.value ? `${groupName.value} · 进群` : '进群通道'))
 
 const groupExists = ref(false)
@@ -70,8 +71,9 @@ onMounted(async () => {
   const ua = navigator.userAgent.toLowerCase()
   wechat.value = ua.includes('micromessenger')
 
-  const { ok, data } = await apiJson('/api/public/group/' + encodeURIComponent(groupName.value))
+  const { ok, data } = await apiJson('/api/public/group/' + encodeURIComponent(routeName.value))
   if (!ok || !data) return
+  groupName.value = data.groupName || routeName.value
   groupExists.value = !!data.groupExists
   qrFile.value = data.qrFile || ''
   wsrvUrl.value = data.wsrvUrl || ''
@@ -80,7 +82,7 @@ onMounted(async () => {
   surveyUrl.value = data.surveyUrl || ''
   surveyButtonText.value = data.surveyButtonText || '填写问卷'
   const origin = window.location.origin
-  fallbackUrl.value = `${origin}/uploads/${encodeURIComponent(groupName.value)}/${encodeURIComponent(data.qrFile || '')}`
+  fallbackUrl.value = `${origin}/uploads/${encodeURIComponent(groupName.value || routeName.value)}/${encodeURIComponent(data.qrFile || '')}`
 })
 
 function onImgError() {
@@ -95,7 +97,7 @@ function saveQr() {
 
 function openSurvey() {
   if (!surveyUrl.value) return
-  const clickUrl = `/api/public/group/${encodeURIComponent(groupName.value)}/survey-click`
+  const clickUrl = `/api/public/group/${encodeURIComponent(routeName.value)}/survey-click`
   fetch(clickUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

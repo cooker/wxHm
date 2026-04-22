@@ -2,6 +2,7 @@ package com.wxhm.controller;
 
 import com.wxhm.config.WxHmProperties;
 import com.wxhm.service.MissingGroupVisitService;
+import com.wxhm.service.GroupAliasService;
 import com.wxhm.service.QrService;
 import com.wxhm.service.SurveyClickService;
 import com.wxhm.service.SurveyConfigService;
@@ -26,16 +27,19 @@ public class ApiPublicController {
     private final WxHmProperties properties;
     private final QrService qrService;
     private final MissingGroupVisitService missingGroupVisitService;
+    private final GroupAliasService groupAliasService;
     private final SurveyConfigService surveyConfigService;
     private final SurveyClickService surveyClickService;
 
     public ApiPublicController(WxHmProperties properties, QrService qrService,
                                MissingGroupVisitService missingGroupVisitService,
+                               GroupAliasService groupAliasService,
                                SurveyConfigService surveyConfigService,
                                SurveyClickService surveyClickService) {
         this.properties = properties;
         this.qrService = qrService;
         this.missingGroupVisitService = missingGroupVisitService;
+        this.groupAliasService = groupAliasService;
         this.surveyConfigService = surveyConfigService;
         this.surveyClickService = surveyClickService;
     }
@@ -47,8 +51,9 @@ public class ApiPublicController {
 
     @GetMapping("/group/{groupName}")
     public Map<String, Object> group(@PathVariable String groupName, HttpServletRequest request) {
-        boolean groupExists = qrService.groupExists(groupName);
-        String qrFile = groupExists ? qrService.getActiveQr(groupName) : null;
+        String resolvedName = groupAliasService.resolveGroupName(groupName);
+        boolean groupExists = qrService.groupExists(resolvedName);
+        String qrFile = groupExists ? qrService.getActiveQr(resolvedName) : null;
 
         String userAgent = request.getHeader("User-Agent");
         String platform = PlatformUtils.parsePlatform(userAgent);
@@ -56,8 +61,8 @@ public class ApiPublicController {
 
         long todayVisitCount = 0;
         if (groupExists) {
-            qrService.logVisit(groupName, clientIp, platform);
-            todayVisitCount = qrService.countTodayVisits(groupName);
+            qrService.logVisit(resolvedName, clientIp, platform);
+            todayVisitCount = qrService.countTodayVisits(resolvedName);
         } else {
             missingGroupVisitService.logVisit(groupName, clientIp, platform);
         }
@@ -68,12 +73,12 @@ public class ApiPublicController {
             if (host == null) host = "localhost:8092";
             String scheme = request.getHeader("X-Forwarded-Proto");
             if (scheme == null || scheme.isBlank()) scheme = "https";
-            String rawUrl = scheme + "://" + host + "/uploads/" + groupName + "/" + qrFile;
+            String rawUrl = scheme + "://" + host + "/uploads/" + resolvedName + "/" + qrFile;
             wsrvUrl = rawUrl + "?we=1&v=" + System.currentTimeMillis() / 1000;
         }
 
         Map<String, Object> m = new HashMap<>();
-        m.put("groupName", groupName);
+        m.put("groupName", resolvedName);
         m.put("groupExists", groupExists);
         m.put("qrFile", qrFile);
         m.put("wsrvUrl", wsrvUrl);
@@ -85,10 +90,11 @@ public class ApiPublicController {
 
     @PostMapping("/group/{groupName}/survey-click")
     public Map<String, Object> surveyClick(@PathVariable String groupName, HttpServletRequest request) {
+        String resolvedName = groupAliasService.resolveGroupName(groupName);
         String userAgent = request.getHeader("User-Agent");
         String platform = PlatformUtils.parsePlatform(userAgent);
         String clientIp = qrService.getClientIp(request);
-        surveyClickService.logClick(groupName, clientIp, platform);
+        surveyClickService.logClick(resolvedName, clientIp, platform);
         return Map.of("ok", true);
     }
 }

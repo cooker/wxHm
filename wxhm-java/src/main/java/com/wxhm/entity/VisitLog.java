@@ -1,6 +1,7 @@
 package com.wxhm.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 /**
  * 访问日志
@@ -26,6 +27,9 @@ public class VisitLog {
 
     @Column(length = 20)
     private String platform;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     // getters and setters
     public Long getId() {
@@ -66,5 +70,13 @@ public class VisitLog {
 
     public void setPlatform(String platform) {
         this.platform = platform;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

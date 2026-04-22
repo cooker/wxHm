@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wxhm.config.AdminAuthInterceptor;
 import com.wxhm.config.WxHmProperties;
 import com.wxhm.entity.WeChatTemplate;
+import com.wxhm.repository.VisitLogRepository;
 import com.wxhm.repository.WeChatTemplateRepository;
 import com.wxhm.service.MissingGroupVisitService;
 import com.wxhm.service.QrService;
 import com.wxhm.service.StatsService;
 import com.wxhm.service.WeChatNotifyService;
 import com.wxhm.service.AdminLoginSecurityService;
+import com.wxhm.service.GroupAliasService;
 import com.wxhm.service.SurveyConfigService;
 import com.wxhm.util.PlatformUtils;
 import com.wxhm.wechat.WeChatApi;
@@ -39,6 +41,8 @@ public class ApiAdminController {
     private final AdminLoginSecurityService adminLoginSecurityService;
     private final MissingGroupVisitService missingGroupVisitService;
     private final SurveyConfigService surveyConfigService;
+    private final GroupAliasService groupAliasService;
+    private final VisitLogRepository visitLogRepository;
     private final WeChatTemplateRepository templateRepository;
     private final WeChatApi weChatApi;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -47,6 +51,8 @@ public class ApiAdminController {
                               WeChatNotifyService weChatNotifyService, AdminLoginSecurityService adminLoginSecurityService,
                               MissingGroupVisitService missingGroupVisitService,
                               SurveyConfigService surveyConfigService,
+                              GroupAliasService groupAliasService,
+                              VisitLogRepository visitLogRepository,
                               WeChatTemplateRepository templateRepository, WeChatApi weChatApi) {
         this.properties = properties;
         this.qrService = qrService;
@@ -55,6 +61,8 @@ public class ApiAdminController {
         this.adminLoginSecurityService = adminLoginSecurityService;
         this.missingGroupVisitService = missingGroupVisitService;
         this.surveyConfigService = surveyConfigService;
+        this.groupAliasService = groupAliasService;
+        this.visitLogRepository = visitLogRepository;
         this.templateRepository = templateRepository;
         this.weChatApi = weChatApi;
     }
@@ -169,13 +177,44 @@ public class ApiAdminController {
     @GetMapping("/groups")
     public List<Map<String, Object>> groups() {
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (String g : qrService.listGroups()) {
+        List<String> groupList = qrService.listGroups();
+        Map<String, String> shortNameMap = groupAliasService.getShortNameMap(groupList);
+        for (String g : groupList) {
             Map<String, Object> row = new HashMap<>();
+            String activeQr = qrService.getActiveQr(g);
+            boolean qrActive = activeQr != null;
             row.put("name", g);
-            row.put("qrActive", qrService.hasActiveQr(g));
+            row.put("shortName", shortNameMap.getOrDefault(g, groupAliasService.ensureShortName(g)));
+            row.put("qrActive", qrActive);
+            row.put("visitCount", visitLogRepository.countByGroupName(g));
+            LocalDateTime latest = visitLogRepository.findLatestVisitTimeByGroupName(g);
+            row.put("recentVisitTime", latest != null ? latest.toString() : null);
+            row.put("expireCountdownSeconds", qrActive ? qrService.getRemainingSecondsForActiveQr(g, activeQr) : 0);
             rows.add(row);
         }
         return rows;
+    }
+
+    @PostMapping("/groups/short-name")
+    public ResponseEntity<Map<String, Object>> saveShortName(@RequestBody Map<String, String> body) {
+        String groupName = body != null ? body.get("group_name") : null;
+        String shortName = body != null ? body.get("short_name") : null;
+        if (groupName == null || groupName.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", "group_name 不能为空"));
+        }
+        if (!qrService.groupExists(groupName)) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", "群组不存在"));
+        }
+        try {
+            groupAliasService.setShortName(groupName.trim(), shortName);
+            return ResponseEntity.ok(Map.of(
+                    "ok", true,
+                    "message", "短链名保存成功",
+                    "shortName", groupAliasService.getShortName(groupName.trim())
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "message", e.getMessage()));
+        }
     }
 
     @PostMapping("/groups/upload")
@@ -187,6 +226,7 @@ public class ApiAdminController {
         }
         try {
             qrService.saveGroupQr(group_name.trim(), file.getBytes());
+            groupAliasService.ensureShortName(group_name.trim());
             weChatNotifyService.sendAsync(group_name.trim(), "管理员更新群码", getClientIp(request), "管理员");
             return ResponseEntity.ok(Map.of("ok", true, "message", "更新成功"));
         } catch (IOException e) {
@@ -203,6 +243,7 @@ public class ApiAdminController {
         }
         try {
             qrService.renameGroup(oldName, newName.trim());
+            groupAliasService.onGroupRenamed(oldName, newName.trim());
             weChatNotifyService.sendAsync(newName.trim(), "管理员更名群码（" + oldName + " → " + newName + "）", getClientIp(request), "管理员");
             return ResponseEntity.ok(Map.of("ok", true, "message", "更名成功"));
         } catch (IOException e) {
@@ -214,6 +255,7 @@ public class ApiAdminController {
     public ResponseEntity<Map<String, Object>> deleteGroup(@PathVariable String groupName, HttpServletRequest request) {
         try {
             qrService.deleteGroup(groupName);
+            groupAliasService.onGroupDeleted(groupName);
             weChatNotifyService.sendAsync(groupName, "管理员删除群码", getClientIp(request), "管理员");
             return ResponseEntity.ok(Map.of("ok", true, "message", "删除成功"));
         } catch (IOException e) {

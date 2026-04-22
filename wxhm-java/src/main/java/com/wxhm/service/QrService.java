@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
@@ -209,6 +210,7 @@ public class QrService {
         log.setDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
         log.setIp(ip);
         log.setPlatform(platform);
+        log.setCreatedAt(LocalDateTime.now());
         visitLogRepository.save(log);
     }
 
@@ -228,5 +230,19 @@ public class QrService {
 
     public Path getFilePath(String filename) {
         return properties.getFilesDirPath().resolve(Paths.get(filename).getFileName().toString());
+    }
+
+    public long getRemainingSecondsForActiveQr(String groupName, String qrFile) {
+        if (qrFile == null || qrFile.isBlank()) return 0;
+        try {
+            Path path = getGroupQrPath(groupName, qrFile);
+            if (!Files.exists(path) || !Files.isRegularFile(path)) return 0;
+            long modifiedMillis = Files.getLastModifiedTime(path).toMillis();
+            long expireMillis = modifiedMillis + (long) properties.getExpireDays() * SECONDS_PER_DAY * 1000;
+            long remain = (expireMillis - System.currentTimeMillis()) / 1000;
+            return Math.max(remain, 0);
+        } catch (IOException e) {
+            return 0;
+        }
     }
 }
