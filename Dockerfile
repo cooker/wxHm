@@ -1,27 +1,23 @@
-# 使用轻量级 Python 镜像
-FROM python:3.10-slim
+# 构建 Jar 包
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
 
-# 设置工作目录
+# 复制项目文件并打包
+COPY wxhm-java ./wxhm-java
+WORKDIR /build/wxhm-java
+RUN mvn clean package -DskipTests
+
+# 运行环境
+FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-# 安装必要的系统依赖（Pillow 处理 WebP 需要基础库）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libwebp-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制依赖清单并安装
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 复制项目所有文件
-COPY . .
+# 复制生成的 Jar 包
+COPY --from=builder /build/wxhm-java/target/app.jar /app/app.jar
 
 # 创建上传目录和日志目录
-RUN mkdir -p uploads logs
+RUN mkdir -p /data/wxHm/uploads /app/logs
 
-# 暴露 Flask/Gunicorn 运行端口
 EXPOSE 8092
 
-# 启动命令：使用 Gunicorn，绑定 0.0.0.0
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8092", "app:app"]
+ENV TZ=Asia/Shanghai
+CMD ["java", "-jar", "app.jar", "--server.port=8092"]

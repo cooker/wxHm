@@ -7,12 +7,14 @@ services:
     ports:
       - "8092:8092"
     volumes:
-      # 持久化二维码图片
-      - ./uploads:/app/uploads
-      # 持久化统计数据库
+      # 持久化二维码与自定义文件
+      - ./uploads:/data/wxHm/uploads
+      # 持久化 SQLite 数据库
       - ./stats.db:/app/stats.db
-      # 持久化运行日志
+      # 持久化日志
       - ./logs:/app/logs
     environment:
       - TZ=Asia/Shanghai
+      # 管理后台密码
+      # - ADMIN_PASSWORD=passwd123
     restart: always
